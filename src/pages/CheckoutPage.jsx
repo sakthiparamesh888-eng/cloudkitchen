@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useCart } from "../context/CartContext";
 
 const STORAGE_KEY = "sakthi_user";
+const ORDER_COUNTER_KEY = "sakthi_order_counter";
 
 export default function CheckoutPage() {
   const { cart, total, updateQty, removeFromCart, clearCart } = useCart();
@@ -24,11 +25,12 @@ export default function CheckoutPage() {
     } catch {}
   }, []);
 
+  // --- Only 1 delivery slot ---
   function availableSlots() {
     return ["11:00 AM – 01:00 PM"];
   }
 
-  // cutoff check
+  // --- Lunch cutoff logic ---
   function itemPassesCutoff(item) {
     const itemDateISO = item.deliveryDate
       ? new Date(item.deliveryDate).toISOString().split("T")[0]
@@ -51,7 +53,7 @@ export default function CheckoutPage() {
     if (d.getTime() - now < cutoffMillis) {
       return {
         ok: false,
-        reason: `Order closed for ${new Date(item.deliveryDate).toLocaleDateString()} (12-hour cutoff).`
+        reason: `Order closed for ${new Date(item.deliveryDate).toLocaleDateString()} (12-hour cutoff).`,
       };
     }
 
@@ -68,26 +70,32 @@ export default function CheckoutPage() {
     return { ok: true };
   }
 
-  // group items
+  // Group items by day
   function groupItemsByDay(items) {
     const map = {};
     items.forEach((it) => {
-      const dayLabel = it.dayLabel || it.day || "Not Assigned";
-      if (!map[dayLabel]) map[dayLabel] = [];
-      map[dayLabel].push(it);
+      const dateFormatted = new Date(it.deliveryDate).toLocaleDateString();
+      const title = `${it.dayLabel} (${dateFormatted})`;
+
+      if (!map[title]) map[title] = [];
+      map[title].push(it);
     });
     return map;
   }
 
   // ----------------------------
-  // ⭐ ORDER ID GENERATE (Start with T)
+  // ⭐ ORDER ID (Auto-increment: T001, T002, T003…)
   // ----------------------------
   function generateOrderId() {
-    return "T" + Date.now();
+    let current = Number(localStorage.getItem(ORDER_COUNTER_KEY) || "0");
+    current += 1;
+    localStorage.setItem(ORDER_COUNTER_KEY, current.toString());
+
+    return "T" + String(current).padStart(3, "0");
   }
 
   // ----------------------------
-  // ⭐ WhatsApp Message Builder (NO "New")
+  // ⭐ WhatsApp Message (NO "Order from")
   // ----------------------------
   function whatsappLink(orderId) {
     const grouped = groupItemsByDay(cart);
@@ -96,7 +104,8 @@ export default function CheckoutPage() {
     Object.keys(grouped).forEach((day) => {
       itemsText += `${day}:\n`;
       grouped[day].forEach((i) => {
-        itemsText += `- ${i.qty || 1}x ${i.name}\n`;
+        const date = new Date(i.deliveryDate).toLocaleDateString();
+        itemsText += `- ${i.qty || 1}x ${i.name} (${date})\n`;
       });
       itemsText += `\n`;
     });
@@ -104,7 +113,7 @@ export default function CheckoutPage() {
     const userText = user ? `${user.name}\n${user.phone}\n${user.address}\n\n` : "";
 
     const msg = encodeURIComponent(
-`Order from ${STORE_NAME}
+`${STORE_NAME}
 
 Order ID: ${orderId}
 
@@ -118,7 +127,7 @@ Payment: Paid via GPay`
     return `https://wa.me/${WHATSAPP_NUM.replace(/\+/g, "")}?text=${msg}`;
   }
 
-  // save sheet
+  // Save order to Google sheet
   async function sendOrderToSheet(orderId, paymentId = "", method = "GPay") {
     if (!ORDERS_WEBHOOK) return;
 
@@ -129,9 +138,12 @@ Payment: Paid via GPay`
       date: now.toLocaleDateString(),
       month: now.toLocaleString("default", { month: "long" }),
       year: now.getFullYear(),
-      items: cart.map(i =>
-        `${i.qty || 1}x ${i.name} (${new Date(i.deliveryDate).toLocaleDateString()})`
-      ).join(" | "),
+      items: cart
+        .map(
+          (i) =>
+            `${i.qty || 1}x ${i.name} (${new Date(i.deliveryDate).toLocaleDateString()})`
+        )
+        .join(" | "),
       total,
       slot,
       deliveryDate: cart[0]?.deliveryDate || "",
@@ -140,14 +152,14 @@ Payment: Paid via GPay`
       deliveryAddress: user?.address || "",
       paymentMethod: method,
       paymentStatus: "Paid",
-      paymentRef: paymentId
+      paymentRef: paymentId,
     };
 
     try {
       await fetch(ORDERS_WEBHOOK, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
     } catch {}
   }
@@ -155,6 +167,7 @@ Payment: Paid via GPay`
   async function handleConfirmPayment() {
     const valid = validateAllItems();
     if (!valid.ok) return alert(valid.reason);
+
     if (!user) return alert("Please sign up before confirming payment.");
 
     setVerified(true);
@@ -181,29 +194,56 @@ Payment: Paid via GPay`
       <div className="checkout-layout">
         {/* LEFT */}
         <div className="checkout-items">
-          {cart.length === 0 && <div className="glass-card">Your cart is empty</div>}
+          {cart.length === 0 && (
+            <div className="glass-card">Your cart is empty</div>
+          )}
 
           {cart.map((it) => (
             <div className="checkout-card" key={it.id}>
-              <img src={it.imageUrl || "/no-image.png"} className="checkout-img" />
+              <img
+                src={it.imageUrl || "/no-image.png"}
+                className="checkout-img"
+              />
               <div className="checkout-info">
                 <div className="checkout-title">{it.name}</div>
                 <div className="checkout-sub">₹{it.price}</div>
-                <div className="checkout-day muted">Day: {it.dayLabel}</div>
-                <div style={{ fontSize: 13, color: "#9fbbe0", marginTop: 6 }}>
+
+                {/* ⭐ Day + Date */}
+                <div className="checkout-day muted">
+                  {it.dayLabel} ({new Date(it.deliveryDate).toLocaleDateString()})
+                </div>
+
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: "#9fbbe0",
+                    marginTop: 6,
+                  }}
+                >
                   Category: {it.category}
                 </div>
 
                 <div className="qty-controls">
-                  <button onClick={() => updateQty(it.id, (it.qty || 1) - 1)}>-</button>
+                  <button onClick={() => updateQty(it.id, (it.qty || 1) - 1)}>
+                    -
+                  </button>
                   <span>{it.qty || 1}</span>
-                  <button onClick={() => updateQty(it.id, (it.qty || 1) + 1)}>+</button>
+                  <button onClick={() => updateQty(it.id, (it.qty || 1) + 1)}>
+                    +
+                  </button>
                 </div>
 
-                <button className="remove-btn" onClick={() => removeFromCart(it.id)}>Remove</button>
+                <button
+                  className="remove-btn"
+                  onClick={() => removeFromCart(it.id)}
+                >
+                  Remove
+                </button>
               </div>
 
-              <div className="checkout-total">₹{it.price * (it.qty || 1)}</div>
+              <div className="checkout-total">
+                ₹{it.price * (it.qty || 1)}
+              </div>
             </div>
           ))}
         </div>
@@ -212,7 +252,10 @@ Payment: Paid via GPay`
         <div className="checkout-summary glass-card">
           <h3>Order Summary</h3>
 
-          <small className="muted" style={{ display: "block", marginBottom: 10 }}>
+          <small
+            className="muted"
+            style={{ display: "block", marginBottom: 10 }}
+          >
             *Costs include delivery fee and package fee.
           </small>
 
@@ -221,28 +264,45 @@ Payment: Paid via GPay`
             <span className="summary-amount">₹{total}</span>
           </div>
 
+          {/* Slot selection */}
           <div className="checkout-block">
             <label className="label">Delivery Slot</label>
-            <select className="select" value={slot} onChange={(e) => setSlot(e.target.value)}>
+            <select
+              className="select"
+              value={slot}
+              onChange={(e) => setSlot(e.target.value)}
+            >
               {availableSlots().map((s) => (
-                <option key={s} value={s}>{s}</option>
+                <option key={s} value={s}>
+                  {s}
+                </option>
               ))}
             </select>
-            <small className="muted">Lunch orders close 12 hours before 11 AM.</small>
+            <small className="muted">
+              Lunch orders close 12 hours before 11 AM.
+            </small>
           </div>
 
+          {/* QR */}
           <div className="qr-box glass-card">
             <h3 className="qr-title">Scan & Pay using GPay</h3>
             <img src="/gpay-qr.png" className="qr-image" />
             <p className="qr-note">After payment, click Confirm Payment.</p>
           </div>
 
-          <button className="btn-pay" onClick={handleConfirmPayment} disabled={processing}>
+          <button
+            className="btn-pay"
+            onClick={handleConfirmPayment}
+            disabled={processing}
+          >
             I Have Completed Payment
           </button>
 
           {!user && (
-            <button className="btn-ghost" onClick={() => (window.location.href = "/auth")}>
+            <button
+              className="btn-ghost"
+              onClick={() => (window.location.href = "/auth")}
+            >
               Sign up
             </button>
           )}
@@ -251,15 +311,19 @@ Payment: Paid via GPay`
             className="btn-whatsapp"
             disabled={!verified || !user}
             style={{
-              opacity: (!verified || !user) ? 0.5 : 1,
-              pointerEvents: (!verified || !user) ? "none" : "auto"
+              opacity: !verified || !user ? 0.5 : 1,
+              pointerEvents: !verified || !user ? "none" : "auto",
             }}
             onClick={handleSendOrder}
           >
             Send Order via WhatsApp
           </button>
 
-          <button className="btn-ghost btn-block" style={{ marginTop: 10, color: "red" }} onClick={clearCart}>
+          <button
+            className="btn-ghost btn-block"
+            style={{ marginTop: 10, color: "red" }}
+            onClick={clearCart}
+          >
             Clear Order
           </button>
         </div>

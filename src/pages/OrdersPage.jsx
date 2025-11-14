@@ -29,6 +29,7 @@ export default function OrdersPage() {
         const url = import.meta.env.VITE_SHEET_MENU_CSV_URL;
         const r = await fetch(url);
         const txt = await r.text();
+
         const parsed = parseCSV(txt).map((r) => ({
           id: r.id || Math.random().toString(36).slice(2, 9),
           name: r.name,
@@ -38,6 +39,7 @@ export default function OrdersPage() {
           isActive: ((r.isActive || "true").toLowerCase() === "true"),
           day: (r.day || r.availableDays || "").toLowerCase(),
           imageUrl: r.imageUrl,
+          stockAvailability: (r.stockAvailability || "in").toLowerCase(),   // ⭐ NEW STOCK COLUMN
         }));
 
         setMenuItems(parsed.filter((p) => p.category === meal && p.isActive));
@@ -60,25 +62,23 @@ export default function OrdersPage() {
     );
 
   // Build upcoming dates and **exclude Saturday & Sunday**
-  // upcomingDates(7) returns objects with { iso, weekday } — to be robust we use Date.getDay()
   const upcomingAll = upcomingDates(7);
   const upcoming = upcomingAll.filter((d) => {
-    // convert iso to Date and get day index: 0 = Sunday, 6 = Saturday
     const dayIndex = new Date(d.iso).getDay();
-    return dayIndex !== 0 && dayIndex !== 6; // exclude Sun (0) & Sat (6)
+    return dayIndex !== 0 && dayIndex !== 6; // Sun=0, Sat=6
   });
 
-  // Keep up to 5 days that actually have menu entries
   const daysWithItems = upcoming
     .filter((d) =>
       menuItems.some((mi) => {
         if (!mi.day) return false;
-        // mi.day may be "mon" or "mon,tue". handle both robustly
         const allowed = mi.day
           .split(/[\s,;|,]+/)
           .map((x) => x.trim().slice(0, 3).toLowerCase());
-        // compare against weekday from iso date
-        const wk = new Date(d.iso).toLocaleDateString(undefined, { weekday: "short" }).slice(0, 3).toLowerCase();
+        const wk = new Date(d.iso)
+          .toLocaleDateString(undefined, { weekday: "short" })
+          .slice(0, 3)
+          .toLowerCase();
         return allowed.includes(wk);
       })
     )
@@ -99,7 +99,10 @@ export default function OrdersPage() {
           const allowed = (mi.day || "")
             .split(/[\s,;|,]+/)
             .map((x) => x.trim().slice(0, 3).toLowerCase());
-          const wk = new Date(d.iso).toLocaleDateString(undefined, { weekday: "short" }).slice(0, 3).toLowerCase();
+          const wk = new Date(d.iso)
+            .toLocaleDateString(undefined, { weekday: "short" })
+            .slice(0, 3)
+            .toLowerCase();
           return allowed.includes(wk);
         });
 
@@ -115,9 +118,8 @@ export default function OrdersPage() {
 
             <div className="grid">
               {items.map((it) => {
-                // Delivery window start: 11:00 AM (we consider deliveryStart for cutoff)
                 const deliveryStart = new Date(d.iso);
-                deliveryStart.setHours(11, 0, 0, 0); // 11:00 AM local time
+                deliveryStart.setHours(11, 0, 0, 0);
 
                 let isDeliveryClosed = false;
                 let countdownText = "";
@@ -125,13 +127,47 @@ export default function OrdersPage() {
                 if ((it.category || "").toLowerCase() === "lunch") {
                   const now = Date.now();
                   const diffHours = (deliveryStart.getTime() - now) / 3600000;
-                  const hoursLeftToClose = diffHours - 14; // cutoff = 14 hours before delivery start
+                  const hoursLeftToClose = diffHours - 14;
                   isDeliveryClosed = hoursLeftToClose <= 0;
-                  countdownText = isDeliveryClosed ? "Delivery Closed" : `Closes in ${formatCountdown(hoursLeftToClose)}`;
+                  countdownText = isDeliveryClosed
+                    ? "Delivery Closed"
+                    : `Closes in ${formatCountdown(hoursLeftToClose)}`;
                 }
 
+                // ⭐ NEW — STOCK CHECK
+                const isOutOfStock = it.stockAvailability === "out";
+
                 return (
-                  <div className="food-card" key={it.id}>
+                  <div
+                    className="food-card"
+                    key={it.id}
+                    style={{
+                      position: "relative",
+                      filter: isOutOfStock ? "grayscale(80%) blur(1px)" : "none",
+                      opacity: isOutOfStock ? 0.6 : 1,
+                    }}
+                  >
+                    {/* ⭐ NEW OUT OF STOCK BADGE */}
+                    {isOutOfStock && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: 10,
+                          right: 10,
+                          background: "rgba(255,0,0,0.85)",
+                          padding: "6px 12px",
+                          color: "white",
+                          fontWeight: "700",
+                          borderRadius: "8px",
+                          fontSize: 12,
+                          boxShadow: "0 0 10px red",
+                          animation: "pulse 1.5s infinite",
+                        }}
+                      >
+                        OUT OF STOCK
+                      </div>
+                    )}
+
                     <div className="card-img-box">
                       <img
                         src={it.imageUrl || "/no-image.png"}
@@ -140,6 +176,16 @@ export default function OrdersPage() {
                         onError={(e) => (e.target.src = "/no-image.png")}
                       />
                     </div>
+
+                    <style>
+                      {`
+                      @keyframes pulse {
+                        0% { transform: scale(1); }
+                        50% { transform: scale(1.08); }
+                        100% { transform: scale(1); }
+                      }
+                      `}
+                    </style>
 
                     <div className="food-info">
                       <h3>{it.name}</h3>
@@ -162,26 +208,26 @@ export default function OrdersPage() {
                         </div>
                       )}
 
-                      {/* When delivery closed we still allow booking. Show a note. */}
-                      {(it.category || "").toLowerCase() === "lunch" && isDeliveryClosed && (
+                      {isDeliveryClosed && (
                         <div style={{ fontSize: 12, color: "#f59e0b", marginBottom: 8 }}>
-                          Delivery not available for this day — booking accepted.
+                          Delivery unavailable — booking accepted.
                         </div>
                       )}
 
                       <div className="card-actions">
                         <div className="price">₹{it.price}</div>
 
-                        {/* Booking allowed even when delivery closed.
-                            Provide deliveryAvailable flag for downstream logic. */}
                         <button
                           className="btn-primary"
+                          disabled={isOutOfStock}
                           style={{
-                            opacity: 1,
-                            pointerEvents: "auto",
-                            cursor: "pointer",
+                            opacity: isOutOfStock ? 0.4 : 1,
+                            cursor: isOutOfStock ? "not-allowed" : "pointer",
+                            pointerEvents: isOutOfStock ? "none" : "auto",
                           }}
                           onClick={() => {
+                            if (isOutOfStock) return;
+
                             addToCart({
                               id: it.id,
                               name: it.name,
@@ -197,7 +243,9 @@ export default function OrdersPage() {
                             });
                           }}
                         >
-                          {isDeliveryClosed
+                          {isOutOfStock
+                            ? "Out of Stock"
+                            : isDeliveryClosed
                             ? "Book (Delivery Closed)"
                             : `Add to cart (for ${new Date(d.iso).toLocaleDateString()})`}
                         </button>
