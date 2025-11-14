@@ -76,39 +76,35 @@ Delivery Slot: ${slot}`
   }
 
   // ⭐ FINAL WORKING GOOGLE SHEET API CALL ⭐
-  async function sendOrderToSheet(orderId) {
-    if (!ORDERS_WEBHOOK) return;
+ async function sendOrderToSheet(orderId) {
+  if (!ORDERS_WEBHOOK) return;
 
-    const now = new Date();
+  const now = new Date();
 
-    const payload = {
-      orderId,
-      customerName: user?.name || "",
-      customerPhone: user?.phone || "",
-      customerAddress: user?.address || "",
-      items: cart
-        .map(
-          (i) =>
-            `${i.qty || 1}x ${i.name} (${new Date(
-              i.deliveryDate
-            ).toLocaleDateString()})`
-        )
-        .join(" | "),
-      total,
-      slot,
-      orderDate: now.toLocaleDateString(),
-    };
+  const payload = {
+    "Order ID": orderId,
+    "Name": user?.name || "",
+    "Phone": user?.phone || "",
+    "Address": user?.address || "",
+    "Order Items": cart
+      .map(i => `${i.qty || 1}x ${i.name} (${new Date(i.deliveryDate).toLocaleDateString()})`)
+      .join(" | "),
+    "Amount": total,
+    "Slot": slot,
+    "Date": now.toLocaleDateString()
+  };
 
-    try {
-      await fetch(ORDERS_WEBHOOK, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-    } catch (err) {
-      console.error("SHEET ERROR", err);
-    }
+  try {
+    await fetch(ORDERS_WEBHOOK, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    console.error("SHEET ERROR:", err);
   }
+}
+
 
   async function handleConfirmPayment() {
     if (!user) return alert("Please sign up first.");
