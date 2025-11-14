@@ -8,6 +8,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import FloatingCart from "./components/FloatingCart";
 import SuccessPage from "./pages/SuccessPage";
 import FloatingTools from "./components/FloatingTools";
+import AuthPage from "./pages/AuthPage";
 
 export default function App(){
   return (
@@ -19,7 +20,7 @@ export default function App(){
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/success" element={<SuccessPage />} />
-
+        <Route path="/auth" element={<AuthPage />} />
       </Routes>
       <FloatingCart />
      
