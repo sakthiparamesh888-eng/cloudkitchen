@@ -1,9 +1,10 @@
 // src/components/Header.jsx
-import React, {useState} from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 
-export default function Header(){
-  const [open,setOpen] = useState(false);
+export default function Header() {
+  const [open, setOpen] = useState(false);
+
   return (
     <header className="site-header">
       <div className="site-brand">
@@ -11,33 +12,59 @@ export default function Header(){
         <div className="brand-name">Sakthi Kitchen</div>
       </div>
 
+      {/* Desktop Links */}
       <nav className="nav-links">
         <Link to="/">Home</Link>
         <Link to="/orders?meal=lunch">Orders</Link>
         <Link to="/checkout">Checkout</Link>
-       
       </nav>
 
-      <div className="hamburger" onClick={()=> setOpen(v=>!v)}>
-        <div style={{width:30,height:4,background:"rgba(255,255,255,0.6)",borderRadius:6,marginBottom:6}} />
-        <div style={{width:20,height:4,background:"rgba(255,255,255,0.6)",borderRadius:6}} />
+      {/* Hamburger Icon */}
+      <div className="hamburger" onClick={() => setOpen(!open)}>
+        <span style={{
+          width: "26px",
+          height: "3px",
+          background: "white",
+          borderRadius: "4px"
+        }}></span>
+        <span style={{
+          width: "20px",
+          height: "3px",
+          background: "white",
+          borderRadius: "4px"
+        }}></span>
       </div>
 
-      {/* mobile menu overlay */}
+      {/* MOBILE SLIDE MENU */}
       {open && (
-        <div style={{
-          position:"fixed",left:0,top:0,bottom:0,right:0,background:"rgba(0,0,0,0.6)",zIndex:2000
-        }} onClick={()=> setOpen(false)}>
-          <div style={{width:260, background:"#071322", height:"100%", padding:20}} onClick={e=>e.stopPropagation()}>
-            <button style={{marginBottom:12}} onClick={()=> setOpen(false)}>Close ✕</button>
-            <div style={{display:"flex",flexDirection:"column",gap:12}}>
-              <Link to="/" onClick={()=> setOpen(false)}>Home</Link>
-              <Link to="/orders?meal=lunch" onClick={()=> setOpen(false)}>Orders</Link>
-              <Link to="/checkout" onClick={()=> setOpen(false)}>Checkout</Link>
-              <Link to="/admin" onClick={()=> setOpen(false)}>Admin</Link>
-            </div>
+        <>
+          {/* Dark overlay */}
+          <div
+            className="overlay"
+            onClick={() => setOpen(false)}
+          />
+
+          {/* Sidebar */}
+          <div
+            className="mobile-menu show"
+            onClick={(e) => e.stopPropagation()}
+          >
+
+            {/* Close Button */}
+            <button
+              className="close-btn"
+              onClick={() => setOpen(false)}
+            >
+              ✕
+            </button>
+
+            {/* Menu Links */}
+            <Link to="/" onClick={() => setOpen(false)}>Home</Link>
+            <Link to="/orders?meal=lunch" onClick={() => setOpen(false)}>Orders</Link>
+            <Link to="/checkout" onClick={() => setOpen(false)}>Checkout</Link>
+            <Link to="/admin" onClick={() => setOpen(false)}>Admin</Link>
           </div>
-        </div>
+        </>
       )}
     </header>
   );

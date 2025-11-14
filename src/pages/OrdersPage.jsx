@@ -5,7 +5,7 @@ import { useCart } from "../context/CartContext";
 import { parseCSV } from "../utils/csvParser";
 import { upcomingDates } from "../utils/date";
 
-// --- Format countdown ---
+// --- Format countdown (h m)
 function formatCountdown(hoursLeft) {
   if (hoursLeft <= 0) return null;
   const totalMinutes = Math.floor(hoursLeft * 60);
@@ -59,16 +59,27 @@ export default function OrdersPage() {
       </div>
     );
 
-  const upcoming = upcomingDates(7);
+  // Build upcoming dates and **exclude Saturday & Sunday**
+  // upcomingDates(7) returns objects with { iso, weekday } — to be robust we use Date.getDay()
+  const upcomingAll = upcomingDates(7);
+  const upcoming = upcomingAll.filter((d) => {
+    // convert iso to Date and get day index: 0 = Sunday, 6 = Saturday
+    const dayIndex = new Date(d.iso).getDay();
+    return dayIndex !== 0 && dayIndex !== 6; // exclude Sun (0) & Sat (6)
+  });
 
+  // Keep up to 5 days that actually have menu entries
   const daysWithItems = upcoming
     .filter((d) =>
       menuItems.some((mi) => {
         if (!mi.day) return false;
+        // mi.day may be "mon" or "mon,tue". handle both robustly
         const allowed = mi.day
-          .split(/[\s,;|]+/)
-          .map((x) => x.trim().slice(0, 3));
-        return allowed.includes(d.weekday);
+          .split(/[\s,;|,]+/)
+          .map((x) => x.trim().slice(0, 3).toLowerCase());
+        // compare against weekday from iso date
+        const wk = new Date(d.iso).toLocaleDateString(undefined, { weekday: "short" }).slice(0, 3).toLowerCase();
+        return allowed.includes(wk);
       })
     )
     .slice(0, 5);
@@ -86,9 +97,10 @@ export default function OrdersPage() {
       {daysWithItems.map((d) => {
         const items = menuItems.filter((mi) => {
           const allowed = (mi.day || "")
-            .split(/[\s,;|]+/)
-            .map((x) => x.trim().slice(0, 3));
-          return allowed.includes(d.weekday);
+            .split(/[\s,;|,]+/)
+            .map((x) => x.trim().slice(0, 3).toLowerCase());
+          const wk = new Date(d.iso).toLocaleDateString(undefined, { weekday: "short" }).slice(0, 3).toLowerCase();
+          return allowed.includes(wk);
         });
 
         const label = new Date(d.iso).toLocaleDateString(undefined, {
@@ -103,21 +115,19 @@ export default function OrdersPage() {
 
             <div className="grid">
               {items.map((it) => {
-                const deliveryTime = new Date(d.iso);
-                deliveryTime.setHours(12, 0, 0, 0); // Lunch slot = 12 PM
+                // Delivery window start: 11:00 AM (we consider deliveryStart for cutoff)
+                const deliveryStart = new Date(d.iso);
+                deliveryStart.setHours(11, 0, 0, 0); // 11:00 AM local time
 
-                let isClosed = false;
+                let isDeliveryClosed = false;
                 let countdownText = "";
 
-                if (it.category === "lunch") {
+                if ((it.category || "").toLowerCase() === "lunch") {
                   const now = Date.now();
-                  const diffHours = (deliveryTime.getTime() - now) / 3600000;
-                  const hoursLeftToClose = diffHours - 12; // lunch cutoff = 12 hrs before
-
-                  isClosed = hoursLeftToClose <= 0;
-                  countdownText = isClosed
-                    ? "Ordering Closed"
-                    : `Closes in ${formatCountdown(hoursLeftToClose)}`;
+                  const diffHours = (deliveryStart.getTime() - now) / 3600000;
+                  const hoursLeftToClose = diffHours - 14; // cutoff = 14 hours before delivery start
+                  isDeliveryClosed = hoursLeftToClose <= 0;
+                  countdownText = isDeliveryClosed ? "Delivery Closed" : `Closes in ${formatCountdown(hoursLeftToClose)}`;
                 }
 
                 return (
@@ -136,59 +146,60 @@ export default function OrdersPage() {
                       <p>{it.description || "No description"}</p>
 
                       <div style={{ fontSize: 12, color: "#9fbbe0" }}>
-                        Delivery Slot: 12:00 PM – 01:00 PM
+                        Delivery Slot: 11:00 AM – 01:00 PM
                       </div>
 
-                      {it.category === "lunch" && (
+                      {(it.category || "").toLowerCase() === "lunch" && (
                         <div
                           style={{
                             fontSize: 12,
                             marginTop: 6,
                             marginBottom: 6,
-                            color: isClosed ? "red" : "#4ade80",
+                            color: isDeliveryClosed ? "red" : "#4ade80",
                           }}
                         >
                           {countdownText}
                         </div>
                       )}
 
+                      {/* When delivery closed we still allow booking. Show a note. */}
+                      {(it.category || "").toLowerCase() === "lunch" && isDeliveryClosed && (
+                        <div style={{ fontSize: 12, color: "#f59e0b", marginBottom: 8 }}>
+                          Delivery not available for this day — booking accepted.
+                        </div>
+                      )}
+
                       <div className="card-actions">
                         <div className="price">₹{it.price}</div>
 
+                        {/* Booking allowed even when delivery closed.
+                            Provide deliveryAvailable flag for downstream logic. */}
                         <button
                           className="btn-primary"
-                          disabled={it.category === "lunch" && isClosed}
                           style={{
-                            opacity:
-                              it.category === "lunch" && isClosed ? 0.5 : 1,
-                            pointerEvents:
-                              it.category === "lunch" && isClosed
-                                ? "none"
-                                : "auto",
+                            opacity: 1,
+                            pointerEvents: "auto",
+                            cursor: "pointer",
                           }}
                           onClick={() => {
-                            if (it.category === "lunch" && isClosed) return;
-
                             addToCart({
                               id: it.id,
                               name: it.name,
                               price: it.price,
                               imageUrl: it.imageUrl,
-                              category: it.category, // ⭐ REQUIRED FOR CHECKOUT
+                              category: it.category,
                               deliveryDate: d.iso,
+                              deliveryAvailable: !isDeliveryClosed,
                               day: d.weekday,
-                              dayLabel: new Date(d.iso).toLocaleDateString(
-                                undefined,
-                                { weekday: "long" }
-                              ),
+                              dayLabel: new Date(d.iso).toLocaleDateString(undefined, {
+                                weekday: "long",
+                              }),
                             });
                           }}
                         >
-                          {it.category === "lunch" && isClosed
-                            ? "Order Closed"
-                            : `Add to cart (for ${
-                                new Date(d.iso).toLocaleDateString()
-                              })`}
+                          {isDeliveryClosed
+                            ? "Book (Delivery Closed)"
+                            : `Add to cart (for ${new Date(d.iso).toLocaleDateString()})`}
                         </button>
                       </div>
                     </div>
