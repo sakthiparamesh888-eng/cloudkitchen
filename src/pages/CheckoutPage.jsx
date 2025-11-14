@@ -95,15 +95,20 @@ Delivery Slot: ${slot}`
   };
 
   try {
-    await fetch(ORDERS_WEBHOOK, {
+    const res = await fetch(ORDERS_WEBHOOK, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+
+    const out = await res.text();
+    console.log("SCRIPT RESPONSE:", out);
+    
   } catch (err) {
     console.error("SHEET ERROR:", err);
   }
 }
+
 
 
   async function handleConfirmPayment() {
