@@ -45,7 +45,7 @@ export default function AboutPage() {
         >
           Homemade South Indian Food – Light, Tasty & Heartwarming.
           <br />
-          Freshly prepared , every bite filled with love, purity, and tradition.
+          Freshly prepared , every bite filled with  purity, and tradition.
         </p>
 
         {/* Why Choose Box */}
