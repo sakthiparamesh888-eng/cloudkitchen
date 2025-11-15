@@ -14,7 +14,7 @@ export default function HomePage() {
 
       {/* HERO SECTION */}
       <div className="hero">
-        <h1 className="hero-title">Sakthi Kitchen</h1>
+        <h1 className="hero-title">Thayaar Kitchen</h1>
         <p className="hero-sub">Fresh, Healthy & Home-Style Meals</p>
 
         <Link to="/orders?meal=lunch" className="hero-btn">

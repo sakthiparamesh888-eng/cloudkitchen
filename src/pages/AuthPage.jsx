@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const STORAGE_KEY = "sakthi_user";
+const STORAGE_KEY = "Thayaar Kitchen_user";
 
 export default function AuthPage() {
   const navigate = useNavigate();

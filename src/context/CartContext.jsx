@@ -4,10 +4,10 @@ const CartContext = createContext();
 
 export function CartProvider({ children }) {
   const [cart, setCart] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("sakthi_cart") || "[]"); } catch { return []; }
+    try { return JSON.parse(localStorage.getItem("Thayaar Kitchen_cart") || "[]"); } catch { return []; }
   });
 
-  useEffect(() => { localStorage.setItem("sakthi_cart", JSON.stringify(cart)); }, [cart]);
+  useEffect(() => { localStorage.setItem("Thayaar Kitchen_cart", JSON.stringify(cart)); }, [cart]);
 
   function addToCart(item) {
     setCart(prev => {

@@ -2,8 +2,8 @@
 import React, { useEffect, useState } from "react";
 import { useCart } from "../context/CartContext";
 
-const STORAGE_KEY = "sakthi_user";
-const ORDER_COUNTER_KEY = "sakthi_order_counter";
+const STORAGE_KEY = "Thayaar Kitchen_user";
+const ORDER_COUNTER_KEY = "Thayaar Kitchen_order_counter";
 
 export default function CheckoutPage() {
   const { cart, total, updateQty, removeFromCart, clearCart } = useCart();
@@ -13,7 +13,7 @@ export default function CheckoutPage() {
   const [user, setUser] = useState(null);
 
   const WHATSAPP_NUM = import.meta.env.VITE_WHATSAPP_NUMBER;
-  const STORE_NAME = import.meta.env.VITE_STORE_NAME || "Sakthi Kitchen";
+  const STORE_NAME = import.meta.env.VITE_STORE_NAME || "Thayaar Kitchen";
   const ORDERS_WEBHOOK = import.meta.env.VITE_ORDERS_API_URL;
 
   // Load user data

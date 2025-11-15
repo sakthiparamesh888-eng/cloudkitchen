@@ -9,7 +9,7 @@ export default function Header() {
     <header className="site-header">
       <div className="site-brand">
         <div className="logo">🍲</div>
-        <div className="brand-name">Sakthi Kitchen</div>
+        <div className="brand-name">Thayaar Kitchen</div>
       </div>
 
       {/* Desktop Links */}
