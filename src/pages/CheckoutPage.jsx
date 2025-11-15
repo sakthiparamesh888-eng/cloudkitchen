@@ -14,7 +14,7 @@ export default function CheckoutPage() {
 
   const WHATSAPP_NUM = import.meta.env.VITE_WHATSAPP_NUMBER;
   const STORE_NAME = import.meta.env.VITE_STORE_NAME || "Thayaar Kitchen";
-  const ORDERS_WEBHOOK = import.meta.env.VITE_ORDERS_API_URL;
+  const ORDERS_WEBHOOK = import.meta.env.VITE_ORDERS_WEBHOOK;
 
   // Load user data
   useEffect(() => {
@@ -179,7 +179,13 @@ async function sendOrderToSheet(orderId) {
               <div className="checkout-info">
                 <div className="checkout-title">{it.name}</div>
                 <div className="checkout-sub">₹{it.price}</div>
-                <div className="checkout-day muted">{it.dayLabel}</div>
+                <div className="checkout-day muted">
+  {it.dayLabel}
+  <span style={{ marginLeft: 6, color: "#7fb3ff" }}>
+    {new Date(it.deliveryDate).toLocaleDateString()}
+  </span>
+</div>
+
 
                 <div style={{ fontSize: 13, color: "#9fbbe0", marginTop: 6 }}>
                   Category: {it.category}
