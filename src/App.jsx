@@ -5,15 +5,17 @@ import LandingPage from "./pages/LandingPage";
 import OrdersPage from "./pages/OrdersPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import AdminDashboard from "./pages/AdminDashboard";
-import FloatingCart from "./components/FloatingCart";
+
 import SuccessPage from "./pages/SuccessPage";
 import FloatingTools from "./components/FloatingTools";
 import AuthPage from "./pages/AuthPage";
 import AboutPage from "./pages/AboutPage";
-export default function App(){
+
+export default function App() {
   return (
     <>
       <Header />
+
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/orders" element={<OrdersPage />} />
@@ -23,8 +25,11 @@ export default function App(){
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/about" element={<AboutPage />} />
       </Routes>
-      <FloatingCart />
-     
+
+      
+
+      {/* ✅ Add this line */}
+      <FloatingTools />
     </>
   );
 }

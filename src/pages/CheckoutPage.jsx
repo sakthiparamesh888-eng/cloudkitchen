@@ -28,13 +28,7 @@ export default function CheckoutPage() {
     return ["11:00 AM – 01:00 PM"];
   }
 
-  function generateOrderId() {
-    let c = Number(localStorage.getItem(ORDER_COUNTER_KEY) || "0");
-    c += 1;
-    localStorage.setItem(ORDER_COUNTER_KEY, c.toString());
-    return "T" + String(c).padStart(3, "0");
-  }
-
+  // Group cart items by day
   function group(items) {
     const map = {};
     items.forEach((it) => {
@@ -44,22 +38,24 @@ export default function CheckoutPage() {
     return map;
   }
 
+  // Create WhatsApp message
   function whatsappLink(orderId) {
     const grouped = group(cart);
 
     let itemsText = "";
     Object.keys(grouped).forEach((day) => {
-      itemsText += `${day}:\n`;
+      const dateLabel = new Date(grouped[day][0].deliveryDate).toLocaleDateString();
+
+      itemsText += `${day} (${dateLabel}):\n`;
+
       grouped[day].forEach((i) => {
-        itemsText += `- ${i.qty || 1}x ${i.name} (${new Date(
-          i.deliveryDate
-        ).toLocaleDateString()})\n`;
+        itemsText += `- ${i.qty || 1}x ${i.name}\n`;
       });
+
       itemsText += "\n";
     });
 
-    const userText =
-      user ? `${user.name}\n${user.phone}\n${user.address}\n\n` : "";
+    const userText = user ? `${user.name}\n${user.phone}\n${user.address}\n\n` : "";
 
     const msg = encodeURIComponent(
 `${STORE_NAME}
@@ -75,45 +71,41 @@ Delivery Slot: ${slot}`
     return `https://wa.me/${WHATSAPP_NUM.replace(/\+/g, "")}?text=${msg}`;
   }
 
-  // ⭐ FINAL WORKING GOOGLE SHEET API CALL ⭐
-async function sendOrderToSheet(orderId) {
-  if (!ORDERS_WEBHOOK) return;
+  // Send order to Google Sheet and get REAL orderId
+  async function sendOrderToSheet() {
+    if (!ORDERS_WEBHOOK) return null;
 
-  const now = new Date();
+    const now = new Date();
 
-  const payload = {
-    "Order ID": orderId,
-    "Name": user?.name || "",
-    "Phone": user?.phone || "",
-    "Address": user?.address || "",
-    "Order Items": cart
-      .map(i => `${i.qty || 1}x ${i.name} (${new Date(i.deliveryDate).toLocaleDateString()})`)
-      .join(" | "),
-    "Amount": total,
-    "Slot": slot,
-    "Date": now.toLocaleDateString()
-  };
+    const payload = {
+      "Name": user?.name || "",
+      "Phone": user?.phone || "",
+      "Address": user?.address || "",
+      "Order Items": cart
+        .map(i => `${i.qty || 1}x ${i.name} (${new Date(i.deliveryDate).toLocaleDateString()})`)
+        .join(" | "),
+      "Amount": total,
+      "Slot": slot,
+      "Date": now.toLocaleDateString()
+    };
 
-  // convert to form-encoded string
-  const body = new URLSearchParams(payload).toString();
+    try {
+      const res = await fetch(ORDERS_WEBHOOK, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-  try {
-    const res = await fetch(ORDERS_WEBHOOK, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
-    });
+      const data = await res.json();
+      console.log("SCRIPT RESPONSE:", data);
 
-    const out = await res.text();
-    console.log("SCRIPT RESPONSE:", out);
+      return data.orderId;
 
-  } catch (err) {
-    console.error("SHEET ERROR:", err);
+    } catch (err) {
+      console.error("SHEET ERROR:", err);
+      return null;
+    }
   }
-}
-
-
-
 
   async function handleConfirmPayment() {
     if (!user) return alert("Please sign up first.");
@@ -124,9 +116,10 @@ async function sendOrderToSheet(orderId) {
   async function handleSend() {
     if (!verified) return alert("Confirm payment first.");
 
-    const orderId = generateOrderId();
+    const orderId = await sendOrderToSheet();   // ⭐ Get real ID from sheet
 
-    await sendOrderToSheet(orderId);
+    if (!orderId) return alert("Error saving order!");
+
     window.open(whatsappLink(orderId), "_blank");
 
     clearCart();
@@ -137,7 +130,6 @@ async function sendOrderToSheet(orderId) {
     <div className="checkout-wrapper container">
       <h1 className="page-title">🧾 Checkout</h1>
 
-      {/* Support Button */}
       <div
         style={{
           marginBottom: 20,
@@ -152,10 +144,7 @@ async function sendOrderToSheet(orderId) {
         }}
         onClick={() =>
           window.open(
-            `https://wa.me/${WHATSAPP_NUM.replace(
-              /\+/g,
-              ""
-            )}?text=Hello%2C%20I%20need%20help`,
+            `https://wa.me/${WHATSAPP_NUM.replace(/\+/g, "")}?text=Hello%2C%20I%20need%20help`,
             "_blank"
           )
         }
@@ -172,33 +161,26 @@ async function sendOrderToSheet(orderId) {
 
           {cart.map((it) => (
             <div className="checkout-card" key={it.id}>
-              <img
-                src={it.imageUrl || "/no-image.png"}
-                className="checkout-img"
-              />
+              <img src={it.imageUrl || "/no-image.png"} className="checkout-img" />
               <div className="checkout-info">
                 <div className="checkout-title">{it.name}</div>
                 <div className="checkout-sub">₹{it.price}</div>
-                <div className="checkout-day muted">
-  {it.dayLabel}
-  <span style={{ marginLeft: 6, color: "#7fb3ff" }}>
-    {new Date(it.deliveryDate).toLocaleDateString()}
-  </span>
-</div>
 
+                <div className="checkout-day muted">
+                  {it.dayLabel}
+                  <span style={{ marginLeft: 6, color: "#7fb3ff" }}>
+                    {new Date(it.deliveryDate).toLocaleDateString()}
+                  </span>
+                </div>
 
                 <div style={{ fontSize: 13, color: "#9fbbe0", marginTop: 6 }}>
                   Category: {it.category}
                 </div>
 
                 <div className="qty-controls">
-                  <button onClick={() => updateQty(it.id, (it.qty || 1) - 1)}>
-                    -
-                  </button>
+                  <button onClick={() => updateQty(it.id, (it.qty || 1) - 1)}>-</button>
                   <span>{it.qty || 1}</span>
-                  <button onClick={() => updateQty(it.id, (it.qty || 1) + 1)}>
-                    +
-                  </button>
+                  <button onClick={() => updateQty(it.id, (it.qty || 1) + 1)}>+</button>
                 </div>
 
                 <button className="remove-btn" onClick={() => removeFromCart(it.id)}>
@@ -206,9 +188,7 @@ async function sendOrderToSheet(orderId) {
                 </button>
               </div>
 
-              <div className="checkout-total">
-                ₹{it.price * (it.qty || 1)}
-              </div>
+              <div className="checkout-total">₹{it.price * (it.qty || 1)}</div>
             </div>
           ))}
         </div>
@@ -216,11 +196,11 @@ async function sendOrderToSheet(orderId) {
         {/* RIGHT SIDE */}
         <div className="checkout-summary glass-card">
           <h3>
-  Order Summary{" "}
-  <span style={{ fontSize: "0.8rem", color: "#9bb0c6", fontWeight: 400 }}>
-    (Packing and Delivery fee included)
-  </span>
-</h3>
+            Order Summary{" "}
+            <span style={{ fontSize: "0.8rem", color: "#9bb0c6", fontWeight: 400 }}>
+              (Packing and Delivery fee included)
+            </span>
+          </h3>
 
           <div className="summary-row">
             <span>Total Amount</span>
@@ -235,37 +215,35 @@ async function sendOrderToSheet(orderId) {
               onChange={(e) => setSlot(e.target.value)}
             >
               {availableSlots().map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
+                <option key={s} value={s}>{s}</option>
               ))}
             </select>
           </div>
 
-          {/* QR CODE */}
           <div className="qr-box glass-card">
             <h3 className="qr-title">Scan & Pay using GPay</h3>
             <img src="/gpay-qr.png" className="qr-image" />
-            <a
-  href={`upi://pay?pa=Ganeshmuthu.2711-1@okicici&pn=Thayaar%20Kitchen&am=${total}&cu=INR`}
-  style={{
-    display: "block",
-    marginTop: "15px",
-    padding: "12px 18px",
-    background: "#00aaff",
-    color: "white",
-    textAlign: "center",
-    borderRadius: "10px",
-    fontSize: "1.1rem",
-    textDecoration: "none",
-    fontWeight: "600",
-    boxShadow: "0 0 12px rgba(0,150,255,0.5)"
-  }}
->
-  💳 Pay Instantly with GPay / PhonePe / Paytm
-</a>
 
-            <p className="qr-note">After payment, click I Have Completed The Payment.</p>
+            <a
+              href={`upi://pay?pa=Ganeshmuthu.2711-1@okicici&pn=Thayaar%20Kitchen&am=${total}&cu=INR`}
+              style={{
+                display: "block",
+                marginTop: "15px",
+                padding: "12px 18px",
+                background: "#00aaff",
+                color: "white",
+                textAlign: "center",
+                borderRadius: "10px",
+                fontSize: "1.1rem",
+                textDecoration: "none",
+                fontWeight: "600",
+                boxShadow: "0 0 12px rgba(0,150,255,0.5)"
+              }}
+            >
+              💳 Pay Instantly with GPay / PhonePe / Paytm
+            </a>
+
+            <p className="qr-note">After payment, click 👇</p>
           </div>
 
           <button className="btn-pay" onClick={handleConfirmPayment}>
