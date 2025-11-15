@@ -240,7 +240,26 @@ async function sendOrderToSheet(orderId) {
           <div className="qr-box glass-card">
             <h3 className="qr-title">Scan & Pay using GPay</h3>
             <img src="/gpay-qr.png" className="qr-image" />
-            <p className="qr-note">After payment, click confirm.</p>
+            <a
+  href={`upi://pay?pa=YOUR-UPI-ID-HERE&pn=Thayaar%20Kitchen&am=${total}&cu=INR`}
+  style={{
+    display: "block",
+    marginTop: "15px",
+    padding: "12px 18px",
+    background: "#00aaff",
+    color: "white",
+    textAlign: "center",
+    borderRadius: "10px",
+    fontSize: "1.1rem",
+    textDecoration: "none",
+    fontWeight: "600",
+    boxShadow: "0 0 12px rgba(0,150,255,0.5)"
+  }}
+>
+  💳 Pay Instantly with GPay / PhonePe / Paytm
+</a>
+
+            <p className="qr-note">After payment, click I Have Completed The Payment.</p>
           </div>
 
           <button className="btn-pay" onClick={handleConfirmPayment}>

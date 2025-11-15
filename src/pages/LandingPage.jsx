@@ -13,18 +13,32 @@ export default function LandingPage() {
     { id: "snacks", label: "Snacks", icon: "🍪" },
   ];
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const url = import.meta.env.VITE_SHEET_MENU_CSV_URL;
-        const r = await fetch(url);
-        const txt = await r.text();
-        const rows = parseCSV(txt);
-        const found = rows.find((r) => r.activeMeal && r.activeMeal.trim() !== "");
-        if (found) setActiveMeal(found.activeMeal.trim().toLowerCase());
-      } catch (e) {}
-    })();
-  }, []);
+ useEffect(() => {
+  async function loadActiveMeal() {
+    try {
+      const url = import.meta.env.VITE_SHEET_MENU_CSV_URL;
+      const r = await fetch(url);
+      const txt = await r.text();
+      const rows = parseCSV(txt);
+
+      const found = rows.find(r => r.activeMeal && r.activeMeal.trim() !== "");
+      if (found) {
+        setActiveMeal(found.activeMeal.trim().toLowerCase());
+      }
+    } catch (e) {
+      console.log("Sheet fetch error:", e);
+    }
+  }
+
+  // Initial load
+  loadActiveMeal();
+
+  // Auto refresh every 5 seconds
+  const interval = setInterval(loadActiveMeal, 5000);
+
+  return () => clearInterval(interval);
+}, []);
+
 
   return (
     <div className="container">
