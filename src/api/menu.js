@@ -1,46 +1,36 @@
-// src/api/menu.js
+file2 : menu.js
 export async function fetchMenu() {
-  const base = import.meta.env.VITE_SHEET_MENU_CSV_URL;
-  if (!base) {
-    console.error("❌ VITE_SHEET_MENU_CSV_URL is missing");
-    return [];
-  }
+  const url = import.meta.env.VITE_SHEET_MENU_CSV_URL;
 
-  // 🚀 FORCE NO CACHE – always fresh menu from Google Sheet
-  const sep = base.includes("?") ? "&" : "?";
-  const url = `${base}${sep}cb=${Date.now()}`;
-
-  const res = await fetch(url, {
-    cache: "no-store",
-    headers: {
-      "Cache-Control": "no-cache, no-store, must-revalidate",
-      Pragma: "no-cache",
-      Expires: "0",
-    },
-  });
-
+  const res = await fetch(url);
   const text = await res.text();
 
-  // --- BASIC FAST CSV PARSER ---
+  // Convert CSV → Array
   const rows = text.trim().split("\n");
-  const headers = rows[0].split(",");
+  const header = rows[0].split(",");
 
-  const list = rows.slice(1).map((line) => {
+  const data = [];
+
+  rows.slice(1).forEach((line) => {
     const cols = line.split(",");
-    const obj = {};
-    headers.forEach((h, i) => (obj[h.trim()] = (cols[i] || "").trim()));
-    return obj;
+    const item = {};
+
+    header.forEach((h, i) => {
+      item[h.trim()] = (cols[i] || "").trim();
+    });
+
+    data.push(item);
   });
 
-  return list.map((r) => ({
+  return data.map((r) => ({
     id: r.id,
     name: r.name,
     description: r.description,
     price: r.price,
-    category: (r.category || "").toLowerCase(),
+    category: r.category.toLowerCase(),
     isActive: (r.isActive || "").toLowerCase() === "true",
     availableDays: r.availableDays?.split(",") || [],
-    imageUrl: r.imageUrl,
+    imageUrl: r.imageUrl
   }));
 }
 
