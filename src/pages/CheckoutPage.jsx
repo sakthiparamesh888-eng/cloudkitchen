@@ -228,7 +228,8 @@ async function sendOrderToSheet() {
   </div>
 
   <a
-    href={`upi://pay?pa=Ganeshmuthu.2711-1@okicici&pn=Thaayar%20Kitchen&am=${total}&cu=INR`}
+  href={`upi://pay?pa=ganeshmuthu2711@okicici&pn=Thaayar%20Kitchen&am=${total}&cu=INR`}
+
     className="btn-primary-pay"
   >
     💳 Pay with GPay / PhonePe / Paytm

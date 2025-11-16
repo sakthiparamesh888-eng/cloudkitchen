@@ -3,48 +3,37 @@ import { Link } from "react-router-dom";
 
 export default function SuccessPage() {
   return (
-    <div className="success-wrapper">
+    <div className="success-wrapper fade-in">
       <div className="success-card">
-        
+
+        {/* Checkmark */}
         <div className="checkmark-circle">
           <div className="checkmark"></div>
         </div>
 
-        <h1>Order Placed Successfully! 🎉</h1>
-        <p>Your order has been received.</p>
+        <h1 className="success-title">Order Placed 🎉</h1>
+        <p className="success-sub">Your order has been received!</p>
 
-        {/* --- Section 1: Intro Food Quality --- */}
-        <div className="success-section">
-          <h3>Homemade South Indian Dinners – Light, Tasty & Heartwarming</h3>
-          <p>Pure Taste • Hygienic • Homemade Love</p>
+        {/* Section 1 */}
+        <div className="success-box">
+          <h3>Homemade South Indian Meals</h3>
+          <p>Light • Hygienic • Tasty</p>
         </div>
 
-        {/* --- Section 2: Why Choose Thaayar Kitchen --- */}
-        <div className="success-section checklist">
-          <h3>🌸 Why Choose Thaayar Kitchen?</h3>
-          <ul>
-            <li>✅ Homemade & Hygienic</li>
-            <li>✅ No Preservatives</li>
-            <li>✅ Temple-Taste South Indian Food</li>
-            <li>✅ Cooked Fresh Every Day</li>
+        {/* Section 2 */}
+        <div className="success-box">
+          <ul className="success-list">
+            <li>Homemade & Fresh</li>
+            <li>No Preservatives</li>
           </ul>
         </div>
 
-        {/* --- Section 3: Tradition & Taste --- */}
-        <div className="success-section">
-       
+        {/* Section 3 */}
+        <div className="success-box">
           <p>
-            Thaayar Kitchen delivers <strong>“Ammavin Samayal Taste”</strong> right to your doorstep.
+            Thaayar Kitchen brings <strong>Ammavin Samayal Suvai</strong> straight to your plate ❤️
           </p>
         </div>
-
-        {/* --- Section 4: Emotional Line --- */}
-        <div className="success-section">
-          <p>Bringing the warmth of Amma’s Samayal straight to your plate ❤️</p>
-        </div>
-
-        {/* --- Section 5: Final line --- */}
-  
 
         <Link to="/">
           <button className="success-btn">Back to Home</button>

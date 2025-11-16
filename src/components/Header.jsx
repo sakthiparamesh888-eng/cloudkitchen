@@ -38,7 +38,7 @@ export default function Header() {
         <>
           <div className="overlay" onClick={() => setOpen(false)} />
 
-          <div className="mobile-menu">
+          <div className={`mobile-menu ${open ? "show" : ""}`}>
             <button className="close-btn" onClick={() => setOpen(false)}>✕</button>
 
             <Link to="/" onClick={() => setOpen(false)}>Home</Link>

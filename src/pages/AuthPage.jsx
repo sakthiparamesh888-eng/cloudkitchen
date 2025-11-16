@@ -28,35 +28,59 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="container" style={{ paddingTop: 36 }}>
-      <div style={{ maxWidth: 680, margin: "0 auto" }} className="glass-card">
-        <h2 style={{ marginBottom: 6 }}>{mode === "signup" ? "Sign up" : "Login"}</h2>
-        <p className="subtitle">We only need name, phone and delivery address for orders.</p>
+  <div className="auth-wrapper">
+    <div className="auth-card">
+      <h2 className="auth-title">{mode === "signup" ? "Sign Up" : "Login"}</h2>
+      <p className="auth-subtitle">
+        We need your name, phone & address to complete your order.
+      </p>
 
-        <div style={{ display: "grid", gap: 12, marginTop: 10 }}>
-          <label className="label">Full name</label>
-          <input className="select" value={name} onChange={(e)=>setName(e.target.value)} placeholder="ENTER USERNAME" />
+      <div className="auth-group">
+        <label className="auth-label">Full Name</label>
+        <input
+          className="auth-input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Enter your full name"
+        />
 
-          <label className="label">Phone number</label>
-          <input className="select" value={phone} onChange={(e)=>setPhone(e.target.value)} placeholder="ENTER YOUR MOBILE NUMBER" />
+        <label className="auth-label">Phone Number</label>
+        <input
+          className="auth-input"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="Enter your phone"
+        />
 
-          <label className="label">Delivery address</label>
-          <textarea className="select" value={address} onChange={(e)=>setAddress(e.target.value)} placeholder="ENTER YOUR ADDRESS" rows={3} style={{resize:"vertical"}} />
+        <label className="auth-label">Delivery Address</label>
+        <textarea
+          className="auth-input"
+          rows={3}
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          placeholder="Enter your address"
+        />
 
-          <div style={{ display: "flex", gap: 10 }}>
-            <button className="btn-primary" onClick={saveUser}>
-              Save & Continue
-            </button>
-            <button className="btn-ghost" onClick={() => { localStorage.removeItem(STORAGE_KEY); setName(""); setPhone(""); setAddress(""); }}>
-              Clear
-            </button>
-          </div>
+        <button className="auth-btn" onClick={saveUser}>
+          Save & Continue
+        </button>
 
-          <div style={{ marginTop: 6 }}>
-            <small className="muted">Your data stays only in your browser.</small>
-          </div>
-        </div>
+        <button
+          className="auth-clear"
+          onClick={() => {
+            localStorage.removeItem(STORAGE_KEY);
+            setName("");
+            setPhone("");
+            setAddress("");
+          }}
+        >
+          Clear
+        </button>
+
+        <p className="auth-note">Your details stay only on your device.</p>
       </div>
     </div>
-  );
+  </div>
+);
+
 }
