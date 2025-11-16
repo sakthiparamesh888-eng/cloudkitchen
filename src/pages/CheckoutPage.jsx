@@ -67,7 +67,10 @@ Order ID: ${orderId}
 ${userText}Order Details:
 ${itemsText}
 Total: ₹${total}
-Delivery Slot: ${slot}`
+Delivery Slot: ${slot}
+
+UPI ID: 8524845927@okbizaxis
+Please complete payment and send confirmation.`
     );
 
     return `https://wa.me/${WHATSAPP_NUM.replace(/\+/g, "")}?text=${msg}`;
@@ -130,7 +133,7 @@ Delivery Slot: ${slot}`
     setTimeout(() => (window.location.href = "/success"), 900);
   }
 
-  // ⭐ UPDATED — UNIVERSAL UPI LINK (Google Pay + PhonePe + Paytm + BHIM)
+  // ⭐ UNIVERSAL WORKING UPI LINK (best & safest)
   function upiLink(amount) {
     return `upi://pay?pa=8524845927@okbizaxis&pn=Thaayar%20Kitchen&am=${amount}&cu=INR`;
   }
@@ -233,7 +236,7 @@ Delivery Slot: ${slot}`
             <img src="/gpay-qr.png" className="qr-img" alt="Scan to pay" />
           </div>
 
-          {/* PAYMENT BUTTON */}
+          {/* PAY BUTTON */}
           <a
             href={upiLink(total)}
             className="btn-modern-pay"
@@ -241,8 +244,8 @@ Delivery Slot: ${slot}`
               if (!user) {
                 e.preventDefault();
                 alert("Please sign up before making payment.");
-              } else {
-                if (isMobile) setPaymentClicked(true);
+              } else if (isMobile) {
+                setPaymentClicked(true);
               }
             }}
             style={{
@@ -253,7 +256,7 @@ Delivery Slot: ${slot}`
             💳 Pay Securely
           </a>
 
-          {/* CONFIRM PAYMENT */}
+          {/* CONFIRM */}
           <button
             className="btn-confirm"
             onClick={handleConfirmPayment}
@@ -284,6 +287,7 @@ Delivery Slot: ${slot}`
             </button>
           )}
 
+          {/* SEND ORDER */}
           <button
             className="btn-whatsapp-final"
             disabled={!verified || !user}
