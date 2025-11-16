@@ -17,10 +17,11 @@ export default function OrdersPage() {
   const { addToCart } = useCart();
   const [searchParams] = useSearchParams();
   const meal = (searchParams.get("meal") || "lunch").toLowerCase();
+
   const [menuItems, setMenuItems] = useState([]);
- const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
 
-
+  // FETCH MENU
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -44,7 +45,6 @@ export default function OrdersPage() {
         setMenuItems(parsed.filter((p) => p.category === meal && p.isActive));
       } catch (e) {
         console.error("Menu load failed", e);
-        setMenuItems([]);
       } finally {
         setLoading(false);
       }
@@ -60,10 +60,11 @@ export default function OrdersPage() {
       </div>
     );
 
+  // NEXT 7 DAYS (skip weekend)
   const upcomingAll = upcomingDates(7);
   const upcoming = upcomingAll.filter((d) => {
-    const dayIndex = new Date(d.iso).getDay();
-    return dayIndex !== 0 && dayIndex !== 6;
+    const dow = new Date(d.iso).getDay();
+    return dow !== 0 && dow !== 6;
   });
 
   const daysWithItems = upcoming
@@ -71,7 +72,7 @@ export default function OrdersPage() {
       menuItems.some((mi) => {
         if (!mi.day) return false;
         const allowed = mi.day
-          .split(/[\s,;|,]+/)
+          .split(/[\s,;|]+/)
           .map((x) => x.trim().slice(0, 3).toLowerCase());
         const wk = new Date(d.iso)
           .toLocaleDateString(undefined, { weekday: "short" })
@@ -84,7 +85,7 @@ export default function OrdersPage() {
 
   return (
     <div className="container">
-      <h1 className="page-title"> Upcoming Menu</h1>
+      <h1 className="page-title">Upcoming Menu</h1>
 
       {daysWithItems.length === 0 && (
         <div className="glass-card" style={{ padding: 20 }}>
@@ -95,7 +96,7 @@ export default function OrdersPage() {
       {daysWithItems.map((d) => {
         const items = menuItems.filter((mi) => {
           const allowed = (mi.day || "")
-            .split(/[\s,;|,]+/)
+            .split(/[\s,;|]+/)
             .map((x) => x.trim().slice(0, 3).toLowerCase());
           const wk = new Date(d.iso)
             .toLocaleDateString(undefined, { weekday: "short" })
@@ -116,45 +117,48 @@ export default function OrdersPage() {
 
             <div className="grid">
               {items.map((it) => {
-                let isDeliveryClosed = false;
+                let isClosed = false;
                 let countdownText = "";
 
-                const deliveryStart = new Date(d.iso);
-                deliveryStart.setHours(11, 0, 0, 0);
+                const category = it.category;
 
-                const category = (it.category || "").toLowerCase();
-
-                // ⭐⭐⭐ LUNCH CLOSING TIME ⭐⭐⭐
+                // LUNCH LOGIC (closing 14 hrs before 11 AM)
                 if (category === "lunch") {
+                  const delivery = new Date(d.iso);
+                  delivery.setHours(11, 0, 0, 0);
+
                   const now = Date.now();
-                  const diffHours = (deliveryStart.getTime() - now) / 3600000;
+                  const diffHours = (delivery.getTime() - now) / 3600000;
 
-                  const hoursLeftToClose = diffHours - 14; // 14 hrs before delivery
-                  isDeliveryClosed = hoursLeftToClose <= 0;
+                  const hoursLeftToClose = diffHours - 14;
 
-                  countdownText = isDeliveryClosed
-                    ? "Delivery Closed"
+                  isClosed = hoursLeftToClose <= 0;
+
+                  countdownText = isClosed
+                    ? "Order Closed"
                     : `Order Ends in ${formatCountdown(hoursLeftToClose)}`;
                 }
 
-                // ⭐⭐⭐ SNACKS CLOSING TIME (Same experience as lunch) ⭐⭐⭐
+                // SNACKS LOGIC (closing 14 hrs before 4 PM)
                 if (category === "snacks") {
+                  const delivery = new Date(d.iso);
+                  delivery.setHours(16, 0, 0, 0); // 4 PM
+
                   const now = Date.now();
+                  const diffHours = (delivery.getTime() - now) / 3600000;
 
-                  const snackStart = new Date(d.iso);
-                  snackStart.setHours(16, 0, 0, 0); // 4 PM
-
-                  const diffHours = (snackStart.getTime() - now) / 3600000;
                   const hoursLeftToClose = diffHours - 14;
 
-                  isDeliveryClosed = hoursLeftToClose <= 0;
+                  isClosed = hoursLeftToClose <= 0;
 
-                  countdownText = isDeliveryClosed
-                    ? "Delivery Closed"
+                  countdownText = isClosed
+                    ? "Order Closed"
                     : `Order Ends in ${formatCountdown(hoursLeftToClose)}`;
                 }
 
                 const isOutOfStock = it.stockAvailability === "out";
+
+                const isBlocked = isClosed || isOutOfStock;
 
                 return (
                   <div
@@ -162,27 +166,28 @@ export default function OrdersPage() {
                     key={it.id}
                     style={{
                       position: "relative",
-                      filter: isOutOfStock ? "grayscale(80%) blur(1px)" : "none",
-                      opacity: isOutOfStock ? 0.6 : 1,
+                      filter: isBlocked ? "grayscale(70%) blur(0.5px)" : "none",
+                      opacity: isBlocked ? 0.6 : 1,
                     }}
                   >
-                    {isOutOfStock && (
+                    {isBlocked && (
                       <div
                         style={{
                           position: "absolute",
                           top: 10,
                           right: 10,
-                          background: "rgba(255,0,0,0.85)",
+                          background: isOutOfStock
+                            ? "rgba(255,0,0,0.85)"
+                            : "rgba(255,165,0,0.9)",
                           padding: "6px 12px",
                           color: "white",
                           fontWeight: "700",
                           borderRadius: "8px",
                           fontSize: 12,
-                          boxShadow: "0 0 10px red",
-                          animation: "pulse 1.5s infinite",
+                          boxShadow: "0 0 10px black",
                         }}
                       >
-                        OUT OF STOCK
+                        {isOutOfStock ? "OUT OF STOCK" : "ORDER CLOSED"}
                       </div>
                     )}
 
@@ -195,35 +200,24 @@ export default function OrdersPage() {
                       />
                     </div>
 
-                    <style>
-                      {`
-                      @keyframes pulse {
-                        0% { transform: scale(1); }
-                        50% { transform: scale(1.08); }
-                        100% { transform: scale(1); }
-                      }
-                      `}
-                    </style>
-
                     <div className="food-info">
                       <h3>{it.name}</h3>
                       <p>{it.description || "No description"}</p>
 
-                      {/* Fixed delivery slot for lunch/snacks */}
                       <div style={{ fontSize: 12, color: "#9fbbe0" }}>
                         {category === "snacks"
                           ? "Delivery Slot: 04:00 PM – 06:00 PM"
                           : "Delivery Slot: 11:00 AM – 01:00 PM"}
                       </div>
 
-                      {/* ⭐ Countdown for both lunch + snacks */}
+                      {/* Countdown always shown */}
                       {["lunch", "snacks"].includes(category) && (
                         <div
                           style={{
                             fontSize: 12,
                             marginTop: 6,
                             marginBottom: 6,
-                            color: isDeliveryClosed ? "red" : "#4ade80",
+                            color: isClosed ? "red" : "#4ade80",
                           }}
                         >
                           {countdownText}
@@ -235,14 +229,14 @@ export default function OrdersPage() {
 
                         <button
                           className="btn-primary"
-                          disabled={isOutOfStock}
+                          disabled={isBlocked}
                           style={{
-                            opacity: isOutOfStock ? 0.4 : 1,
-                            cursor: isOutOfStock ? "not-allowed" : "pointer",
-                            pointerEvents: isOutOfStock ? "none" : "auto",
+                            opacity: isBlocked ? 0.4 : 1,
+                            cursor: isBlocked ? "not-allowed" : "pointer",
+                            pointerEvents: isBlocked ? "none" : "auto",
                           }}
                           onClick={() => {
-                            if (isOutOfStock) return;
+                            if (isBlocked) return;
 
                             addToCart({
                               id: it.id,
@@ -251,19 +245,22 @@ export default function OrdersPage() {
                               imageUrl: it.imageUrl,
                               category: it.category,
                               deliveryDate: d.iso,
-                              deliveryAvailable: !isDeliveryClosed,
+                              deliveryAvailable: !isClosed,
                               day: d.weekday,
-                              dayLabel: new Date(d.iso).toLocaleDateString(undefined, {
-                                weekday: "long",
-                              }),
+                              dayLabel: new Date(d.iso).toLocaleDateString(
+                                undefined,
+                                { weekday: "long" }
+                              ),
                             });
                           }}
                         >
                           {isOutOfStock
                             ? "Out of Stock"
-                            : isDeliveryClosed
-                            ? "Book (Delivery Closed)"
-                            : `Add to cart (for ${new Date(d.iso).toLocaleDateString()})`}
+                            : isClosed
+                            ? "Order Closed"
+                            : `Add to cart (for ${new Date(
+                                d.iso
+                              ).toLocaleDateString()})`}
                         </button>
                       </div>
                     </div>
