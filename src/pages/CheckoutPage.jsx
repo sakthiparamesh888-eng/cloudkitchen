@@ -248,7 +248,8 @@ Delivery Slot: ${slot}`
           {/* Mobile Only Pay Button */}
           {isMobile && (
             <a
-              href={`upi://pay?pa=ganeshmuthu2711@okicici&pn=Thaayar%20Kitchen&am=${total}&cu=INR`}
+              href={`upi://pay?pa=9841857762@ybl&pn=Thaayar%20Kitchen&am=${total}&cu=INR`}
+
               className="btn-modern-pay"
               onClick={(e) => {
                 if (!user) {
