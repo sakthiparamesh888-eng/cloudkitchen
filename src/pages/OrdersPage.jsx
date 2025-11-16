@@ -131,7 +131,7 @@ export default function OrdersPage() {
                   isDeliveryClosed = hoursLeftToClose <= 0;
                   countdownText = isDeliveryClosed
                     ? "Delivery Closed"
-                    : `Closes in ${formatCountdown(hoursLeftToClose)}`;
+                    : `Order Ends in ${formatCountdown(hoursLeftToClose)}`;
                 }
 
                 // ⭐ NEW — STOCK CHECK
