@@ -74,12 +74,13 @@ body {
 }
 
 .brand-logo {
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
-  object-fit: cover;
-  box-shadow: 0 0 12px rgba(0,150,255,0.6);
+  width: 46px; /* Set a fixed width */
+  height: 46px; /* Set the same fixed height to make it square */
+  border-radius: 12px; /* Optional: gives a rounded corner effect */
+  object-fit: cover; /* Ensures the image fills the container while preserving its aspect ratio */
+  box-shadow: 0 0 12px rgba(0, 150, 255, 0.6); /* Optional: shadow effect */
 }
+
 
 .brand-name {
   font-size: 1.45rem;
@@ -1154,4 +1155,22 @@ body {
 .food-card {
   max-width: 350px;
   margin: 0 auto;
+}
+/* Hamburger menu styles */
+.hamburger {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 30px;
+  height: 20px;
+  cursor: pointer;
+}
+
+/* Hamburger lines */
+.hamburger .line {
+  height: 3px;
+  background-color: white; /* White color for the lines */
+  border-radius: 5px;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 10px white, 0 0 20px white, 0 0 30px white; /* Glow effect */
 }

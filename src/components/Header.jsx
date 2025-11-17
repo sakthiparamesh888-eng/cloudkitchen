@@ -27,7 +27,9 @@ export default function Header() {
 
         {/* Hamburger */}
         <div className="hamburger" onClick={() => setOpen(!open)}>
-          <span></span><span></span>
+          <span className="line"></span>
+          <span className="line"></span>
+          <span className="line"></span>
         </div>
       </div>
 
