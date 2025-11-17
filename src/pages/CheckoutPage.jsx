@@ -71,39 +71,46 @@ Delivery Slot: ${slot}
     return `https://wa.me/${WHATSAPP_NUM.replace(/\+/g, "")}?text=${msg}`;
   }
 
-  async function sendOrderToSheet() {
-    if (!ORDERS_WEBHOOK) return null;
+// inside src/pages/CheckoutPage.jsx (replace your sendOrderToSheet function)
+async function sendOrderToSheet() {
+  if (!ORDERS_WEBHOOK) return null;
 
-    const now = new Date();
-    const payload = {
-      Name: user?.name || "",
-      Phone: user?.phone || "",
-      Address: user?.address || "",
-      "Order Items": cart
-        .map(
-          (i) =>
-            `${i.qty || 1}x ${i.name} (${new Date(
-              i.deliveryDate
-            ).toLocaleDateString()})`
-        )
-        .join(" | "),
-      Amount: total,
-      Slot: slot,
-      Date: now.toLocaleDateString(),
-    };
+  const now = new Date();
 
-    try {
-      const res = await fetch(ORDERS_WEBHOOK, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams(payload).toString(),
-      });
+  const payload = {
+    "Name": user?.name || "",
+    "Phone": user?.phone || "",
+    "Address": user?.address || "",
+    "Order Items": cart
+      .map(i => `${i.qty || 1}x ${i.name} (${new Date(i.deliveryDate).toLocaleDateString()})`)
+      .join(" | "),
+    "Amount": total,
+    "Slot": slot,
+    "Date": now.toLocaleDateString()
+  };
 
-      return await res.text();
-    } catch {
+  try {
+    const res = await fetch(ORDERS_WEBHOOK, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(payload).toString(),
+    });
+
+    // parse JSON response (Apps Script returns JSON)
+    const data = await res.json();
+    console.log("SCRIPT RESPONSE:", data);
+
+    if (data && data.success && data.orderId) {
+      return data.orderId; // e.g. "TK-4"
+    } else {
+      console.error("Sheet save failed:", data);
       return null;
     }
+  } catch (err) {
+    console.error("SHEET ERROR:", err);
+    return null;
   }
+}
 
   function handleConfirmPayment() {
     if (!user)

@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { parseCSV } from "../utils/csvParser";
-import { upcomingDates } from "../utils/date";
+import { upcomingDates, nextDateForWeekday } from "../utils/date";
 
 function formatCountdown(hoursLeft) {
   if (hoursLeft <= 0) return null;
@@ -11,6 +11,71 @@ function formatCountdown(hoursLeft) {
   const h = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
   return `${h}h ${m}m`;
+}
+
+/**
+ * Helper: return an array of N sequential ISO dates starting at given ISO date (yyyy-mm-dd)
+ */
+function generateSequentialDates(startIso, n = 5) {
+  const arr = [];
+  const start = new Date(startIso + "T00:00:00");
+  for (let i = 0; i < n; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    arr.push({
+      iso: d.toISOString().split("T")[0],
+      dateObj: d,
+    });
+  }
+  return arr;
+}
+
+/**
+ * Returns first N weekday dates according to rule:
+ * - If today is Saturday (6) or Sunday (0): return next week's Mon-Fri
+ * - Otherwise (Mon-Fri): return upcoming weekdays starting from today (max N)
+ */
+function computeVisibleWeekdays(n = 5) {
+  const now = new Date();
+  const dow = now.getDay(); // 0 Sun .. 6 Sat
+
+  // If Saturday or Sunday -> show next week's Monday..Friday
+  if (dow === 6 || dow === 0) {
+    const nextMonIso = nextDateForWeekday("mon", now); // utility returns next occurrence (not today)
+    return generateSequentialDates(nextMonIso, n);
+  }
+
+  // Otherwise (Mon-Fri) -> build upcomingDates(14) and pick first n weekdays (Mon-Fri) starting from today
+  const next14 = upcomingDates(14); // returns {iso, weekday, dateObj} starting from tomorrow
+  // include today manually
+  const today = {
+    iso: new Date().toISOString().split("T")[0],
+    weekday: (new Date()).toLocaleDateString(undefined, { weekday: "short" }).slice(0,3).toLowerCase(),
+    dateObj: new Date(),
+  };
+
+  // combine today + next14, then filter weekdays Mon-Fri
+  const combined = [today, ...next14];
+  const weekdays = combined.filter((d) => {
+    const dayIndex = new Date(d.iso).getDay();
+    return dayIndex >= 1 && dayIndex <= 5; // Mon-Fri
+  });
+
+  // take first n unique ISO dates
+  const unique = [];
+  for (const d of weekdays) {
+    if (!unique.find(u => u.iso === d.iso)) unique.push(d);
+    if (unique.length >= n) break;
+  }
+
+  // If we somehow have less than n (edge case), extend using nextDateForWeekday starting next Monday
+  if (unique.length < n) {
+    const nextMonIso = nextDateForWeekday("mon", new Date());
+    const extra = generateSequentialDates(nextMonIso, n).filter(e => !unique.find(u => u.iso === e.iso)).slice(0, n - unique.length);
+    return [...unique, ...extra];
+  }
+
+  return unique.slice(0, n);
 }
 
 export default function OrdersPage() {
@@ -21,7 +86,7 @@ export default function OrdersPage() {
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // FETCH MENU
+  // FETCH MENU CSV
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -45,6 +110,7 @@ export default function OrdersPage() {
         setMenuItems(parsed.filter((p) => p.category === meal && p.isActive));
       } catch (e) {
         console.error("Menu load failed", e);
+        setMenuItems([]);
       } finally {
         setLoading(false);
       }
@@ -60,28 +126,28 @@ export default function OrdersPage() {
       </div>
     );
 
-  // UPCOMING 7 DAY FILTER
-  const upcomingAll = upcomingDates(7);
-  const upcoming = upcomingAll.filter((d) => {
-    const dow = new Date(d.iso).getDay();
-    return dow !== 0 && dow !== 6;
-  });
+  // Compute which weekdays to show (5 weekdays)
+  const daysToShow = computeVisibleWeekdays(5);
 
-  const daysWithItems = upcoming
-    .filter((d) =>
-      menuItems.some((mi) => {
-        if (!mi.day) return false;
-        const allowed = mi.day
-          .split(/[\s,;|]+/)
-          .map((x) => x.trim().slice(0, 3).toLowerCase());
-        const wk = new Date(d.iso)
-          .toLocaleDateString(undefined, { weekday: "short" })
-          .slice(0, 3)
-          .toLowerCase();
-        return allowed.includes(wk);
-      })
-    )
-    .slice(0, 5);
+  // Build daysWithItems by matching menuItems day short names
+  const daysWithItems = daysToShow.map((d) => {
+    // compute weekday short like 'mon','tue' from the date
+    const wk = new Date(d.iso)
+      .toLocaleDateString(undefined, { weekday: "short" })
+      .slice(0, 3)
+      .toLowerCase();
+
+    // find items that include this weekday in their day field
+    const items = menuItems.filter((mi) => {
+      if (!mi.day) return false;
+      const allowed = mi.day
+        .split(/[\s,;|]+/)
+        .map((x) => x.trim().slice(0, 3).toLowerCase());
+      return allowed.includes(wk);
+    });
+
+    return { ...d, wk, items };
+  }).filter(d => d.items.length > 0); // keep only days that actually have items
 
   return (
     <div className="container">
@@ -94,17 +160,7 @@ export default function OrdersPage() {
       )}
 
       {daysWithItems.map((d) => {
-        const items = menuItems.filter((mi) => {
-          const allowed = (mi.day || "")
-            .split(/[\s,;|]+/)
-            .map((x) => x.trim().slice(0, 3).toLowerCase());
-          const wk = new Date(d.iso)
-            .toLocaleDateString(undefined, { weekday: "short" })
-            .slice(0, 3)
-            .toLowerCase();
-          return allowed.includes(wk);
-        });
-
+        const items = d.items;
         const labelFull = new Date(d.iso).toLocaleDateString(undefined, {
           weekday: "long",
           month: "short",
@@ -113,7 +169,6 @@ export default function OrdersPage() {
 
         return (
           <section key={d.iso} style={{ marginBottom: 38 }}>
-            {/* ⭐✨ FLOATING GLASS DATE TILE (Style C) */}
             <div className="date-tile fade-soft">
               <span className="date-icon"></span>
               <span>{labelFull}</span>
@@ -125,12 +180,11 @@ export default function OrdersPage() {
                 let countdownText = "";
                 const category = it.category;
 
-                // LUNCH CUT-OFF
+                // LUNCH CUT-OFF (unchanged from your logic)
                 if (category === "lunch") {
                   const delivery = new Date(d.iso);
                   delivery.setHours(11, 0, 0, 0);
-                  const diffHours =
-                    (delivery.getTime() - Date.now()) / 3600000;
+                  const diffHours = (delivery.getTime() - Date.now()) / 3600000;
                   const hoursLeftToClose = diffHours - 14;
                   isClosed = hoursLeftToClose <= 0;
                   countdownText = isClosed
@@ -142,8 +196,7 @@ export default function OrdersPage() {
                 if (category === "snacks") {
                   const delivery = new Date(d.iso);
                   delivery.setHours(16, 0, 0, 0);
-                  const diffHours =
-                    (delivery.getTime() - Date.now()) / 3600000;
+                  const diffHours = (delivery.getTime() - Date.now()) / 3600000;
                   const hoursLeftToClose = diffHours - 14;
                   isClosed = hoursLeftToClose <= 0;
                   countdownText = isClosed
@@ -164,19 +217,16 @@ export default function OrdersPage() {
                       opacity: isBlocked ? 0.6 : 1,
                     }}
                   >
-                    {/* Stock & Closed Tags */}
                     {isBlocked && (
                       <div
                         style={{
                           position: "absolute",
                           top: 10,
                           right: 10,
-                          background: isOutOfStock
-                            ? "rgba(255,0,0,0.85)"
-                            : "rgba(255,165,0,0.9)",
+                          background: isOutOfStock ? "rgba(255,0,0,0.85)" : "rgba(255,165,0,0.9)",
                           padding: "6px 12px",
                           color: "white",
-                          fontWeight: "700",
+                          fontWeight: 700,
                           borderRadius: "8px",
                           fontSize: 12,
                           boxShadow: "0 0 10px black",
@@ -186,7 +236,6 @@ export default function OrdersPage() {
                       </div>
                     )}
 
-                    {/* Image */}
                     <div className="card-img-box">
                       <img
                         src={it.imageUrl || "/no-image.png"}
@@ -206,14 +255,7 @@ export default function OrdersPage() {
                           : "Delivery Slot: 11:00 AM – 01:00 PM"}
                       </div>
 
-                      <div
-                        style={{
-                          fontSize: 12,
-                          marginTop: 6,
-                          marginBottom: 6,
-                          color: isClosed ? "red" : "#4ade80",
-                        }}
-                      >
+                      <div style={{ fontSize: 12, marginTop: 6, marginBottom: 6, color: isClosed ? "red" : "#4ade80" }}>
                         {countdownText}
                       </div>
 
@@ -236,20 +278,11 @@ export default function OrdersPage() {
                               category: it.category,
                               deliveryDate: d.iso,
                               deliveryAvailable: !isClosed,
-                              dayLabel: new Date(d.iso).toLocaleDateString(
-                                undefined,
-                                { weekday: "long" }
-                              ),
+                              dayLabel: new Date(d.iso).toLocaleDateString(undefined, { weekday: "long" }),
                             });
                           }}
                         >
-                          {isBlocked
-                            ? isOutOfStock
-                              ? "Out of Stock"
-                              : "Order Closed"
-                            : `Add to cart (for ${new Date(
-                                d.iso
-                              ).toLocaleDateString()})`}
+                          {isBlocked ? (isOutOfStock ? "Out of Stock" : "Order Closed") : `Add to cart (for ${new Date(d.iso).toLocaleDateString()})`}
                         </button>
                       </div>
                     </div>
@@ -261,153 +294,23 @@ export default function OrdersPage() {
         );
       })}
 
-      {/* DATE TILE + IMAGE CSS */}
+      {/* inline CSS kept from your original for date-tile & image overrides */}
       <style>{`
-        .date-tile {
-          width: fit-content;
-          margin: 14px auto 26px;
-          padding: 10px 22px;
-          border-radius: 20px;
-          background: rgba(255,255,255,0.08);
-          backdrop-filter: blur(14px);
-          border: 1px solid rgba(255,255,255,0.20);
-          color: #bde0ff;
-          font-size: 1.05rem;
-          font-weight: 600;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          box-shadow: 0 0 18px rgba(0,160,255,0.28);
-          animation: glowPulse 2.2s infinite ease-in-out;
-        }
+        .date-tile { width: fit-content; margin: 14px auto 26px; padding: 10px 22px; border-radius: 20px; background: rgba(255,255,255,0.08); backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,0.20); color: #bde0ff; font-size: 1.05rem; font-weight: 600; display: flex; align-items: center; gap: 8px; box-shadow: 0 0 18px rgba(0,160,255,0.28); animation: glowPulse 2.2s infinite ease-in-out; }
+        .date-icon { font-size: 1.2rem; }
+        .fade-soft { animation: fadeInSoft 0.7s ease-out; }
+        @keyframes fadeInSoft { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes glowPulse { 0% { box-shadow: 0 0 12px rgba(0,160,255,0.25); } 50% { box-shadow: 0 0 22px rgba(0,160,255,0.45); } 100% { box-shadow: 0 0 12px rgba(0,160,255,0.25); } }
 
-        .date-icon {
-          font-size: 1.2rem;
-        }
+        .card-img-box { width: 100%; height: auto !important; max-height: none !important; padding: 10px 10px 4px; display:flex; justify-content:center; align-items:center; background: radial-gradient(circle at top, #1e293b, #020617); }
+        .food-img { width: 100%; height: auto !important; object-fit: contain !important; border-radius: 18px; display: block; box-shadow: 0 18px 32px rgba(15,23,42,0.7); }
+        @media (max-width:640px) { .food-img { border-radius:16px; box-shadow:0 12px 24px rgba(15,23,42,0.7);} }
 
-        .fade-soft {
-          animation: fadeInSoft 0.7s ease-out;
-        }
-
-        @keyframes fadeInSoft {
-          from { opacity: 0; transform: translateY(6px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes glowPulse {
-          0% { box-shadow: 0 0 12px rgba(0,160,255,0.25); }
-          50% { box-shadow: 0 0 22px rgba(0,160,255,0.45); }
-          100% { box-shadow: 0 0 12px rgba(0,160,255,0.25); }
-        }
-
-        /* 🔥 FOOD IMAGE OVERRIDE – show full dish, modern look */
-        .card-img-box {
-          width: 100%;
-          height: auto !important;      /* remove fixed height that crops */
-          max-height: none !important;
-          padding: 10px 10px 4px;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          background: radial-gradient(circle at top, #1e293b, #020617);
-        }
-
-        .food-img {
-          width: 100%;
-          height: auto !important;      /* keep aspect ratio */
-          object-fit: contain !important; /* full plate visible, no cut */
-          border-radius: 18px;
-          display: block;
-          box-shadow: 0 18px 32px rgba(15,23,42,0.7);
-        }
-
-        @media (max-width: 640px) {
-          .food-img {
-            border-radius: 16px;
-            box-shadow: 0 12px 24px rgba(15,23,42,0.7);
-          }
-        }
+        .food-card { display:flex; flex-direction: column; }
+        .food-card .card-img-box { width:100%; aspect-ratio:4/3; padding:12px; border-radius:24px 24px 0 0; background: radial-gradient(circle at top, #1e293b, #020617); display:flex; justify-content:center; align-items:center; overflow:hidden; }
+        .food-card .card-img-box img.food-img { max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain; border-radius:18px; display:block; box-shadow:0 18px 30px rgba(15,23,42,0.85); }
+        @media (max-width:640px) { .food-card .card-img-box { aspect-ratio:1/1; padding:10px; } .food-card .card-img-box img.food-img { border-radius:16px; box-shadow:0 12px 24px rgba(15,23,42,0.8); } }
       `}</style>
     </div>
   );
 }
-<style>{`
-  .date-tile {
-    width: fit-content;
-    margin: 14px auto 26px;
-    padding: 10px 22px;
-    border-radius: 20px;
-    background: rgba(255,255,255,0.08);
-    backdrop-filter: blur(14px);
-    border: 1px solid rgba(255,255,255,0.20);
-    color: #bde0ff;
-    font-size: 1.05rem;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    box-shadow: 0 0 18px rgba(0,160,255,0.28);
-    animation: glowPulse 2.2s infinite ease-in-out;
-  }
-
-  .date-icon {
-    font-size: 1.2rem;
-  }
-
-  .fade-soft {
-    animation: fadeInSoft 0.7s ease-out;
-  }
-
-  @keyframes fadeInSoft {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  @keyframes glowPulse {
-    0%   { box-shadow: 0 0 12px rgba(0,160,255,0.25); }
-    50%  { box-shadow: 0 0 22px rgba(0,160,255,0.45); }
-    100% { box-shadow: 0 0 12px rgba(0,160,255,0.25); }
-  }
-
-  /* ⭐ CARD LAYOUT (keeps height under control) */
-  .food-card {
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* 🔥 UNIFORM IMAGE AREA – desktop & mobile */
-  .food-card .card-img-box {
-    width: 100%;
-    aspect-ratio: 4 / 3;                /* ⬅ same height for all cards */
-    padding: 12px;
-    border-radius: 24px 24px 0 0;
-    background: radial-gradient(circle at top, #1e293b, #020617);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow: hidden;                   /* clean rounded corners */
-  }
-
-  .food-card .card-img-box img.food-img {
-    max-width: 100%;
-    max-height: 100%;
-    width: auto;
-    height: auto;
-    object-fit: contain;                /* ⬅ FULL image, no crop */
-    border-radius: 18px;
-    display: block;
-    box-shadow: 0 18px 30px rgba(15,23,42,0.85);
-  }
-
-  /* 📱 Mobile – little more square so card not too long */
-  @media (max-width: 640px) {
-    .food-card .card-img-box {
-      aspect-ratio: 1 / 1;             /* slightly shorter on small screens */
-      padding: 10px;
-    }
-    .food-card .card-img-box img.food-img {
-      border-radius: 16px;
-      box-shadow: 0 12px 24px rgba(15,23,42,0.8);
-    }
-  }
-`}</style>
