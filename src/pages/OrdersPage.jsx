@@ -151,7 +151,7 @@ export default function OrdersPage() {
 
   return (
     <div className="container">
-      <h1 className="page-title">Kitchen-Line Ups</h1>
+      <h1 className="page-title">Kitchen-Line Up</h1>
 
       {daysWithItems.length === 0 && (
         <div className="glass-card" style={{ padding: 20 }}>

@@ -1233,3 +1233,23 @@ body {
     box-shadow: 0 0 12px rgba(255, 87, 34, 0.3);
   }
 }
+.fab-whatsapp {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #25d366;
+  border-radius: 999px;
+  padding: 10px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  z-index: 999;
+}
+
+.fab-help-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+}
