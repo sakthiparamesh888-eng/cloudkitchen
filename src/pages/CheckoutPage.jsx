@@ -72,10 +72,18 @@ Delivery Slot: ${slot}
   }
 
 // inside src/pages/CheckoutPage.jsx (replace your sendOrderToSheet function)
+// inside src/pages/CheckoutPage.jsx (REPLACE your sendOrderToSheet function)
 async function sendOrderToSheet() {
   if (!ORDERS_WEBHOOK) return null;
 
   const now = new Date();
+
+  // ⭐ EXACT TIMESTAMP WHEN CUSTOMER PLACES ORDER
+  const orderPlacedAt = now.toLocaleString("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "medium",
+    hour12: true,
+  });
 
   const payload = {
     "Name": user?.name || "",
@@ -86,7 +94,10 @@ async function sendOrderToSheet() {
       .join(" | "),
     "Amount": total,
     "Slot": slot,
-    "Date": now.toLocaleDateString()
+    "Date": now.toLocaleDateString(),
+
+    // ⭐ ADDING ORDER TIME HERE
+    "orderPlacedAt": orderPlacedAt
   };
 
   try {
@@ -96,12 +107,11 @@ async function sendOrderToSheet() {
       body: new URLSearchParams(payload).toString(),
     });
 
-    // parse JSON response (Apps Script returns JSON)
     const data = await res.json();
     console.log("SCRIPT RESPONSE:", data);
 
     if (data && data.success && data.orderId) {
-      return data.orderId; // e.g. "TK-4"
+      return data.orderId;
     } else {
       console.error("Sheet save failed:", data);
       return null;
