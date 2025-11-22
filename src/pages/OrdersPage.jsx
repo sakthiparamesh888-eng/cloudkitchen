@@ -32,8 +32,8 @@ function generateSequentialDates(startIso, n = 5) {
 
 /**
  * Returns first N weekday dates according to rule:
- * - If today is Saturday (6) or Sunday (0): return next week's Mon-Fri
- * - Otherwise (Mon-Fri): return upcoming weekdays starting from today (max N)
+ * - Build from today + upcoming dates
+ * - Pick first N Mon–Fri
  */
 function computeVisibleWeekdays(n = 5) {
   const now = new Date();
@@ -75,7 +75,6 @@ function computeVisibleWeekdays(n = 5) {
   return unique.slice(0, n);
 }
 
-
 export default function OrdersPage() {
   const { addToCart } = useCart();
   const [searchParams] = useSearchParams();
@@ -101,18 +100,16 @@ export default function OrdersPage() {
           category: (r.category || "").toLowerCase(),
           isActive: (r.isActive || "true").toLowerCase() === "true",
           day: (
-  (r.day ||
-   r.availableDays ||
-   r.availabledays ||
-   "")
-    .toString()
-    .trim()
-    .replace(/\u00A0/g, "")  // remove non-breaking spaces
-    .replace(/\s+/g, "")     // remove normal spaces
-    .toLowerCase()
-),
-
-
+            (r.day ||
+             r.availableDays ||
+             r.availabledays ||
+             "")
+              .toString()
+              .trim()
+              .replace(/\u00A0/g, "")  // remove non-breaking spaces
+              .replace(/\s+/g, "")     // remove normal spaces
+              .toLowerCase()
+          ),
           imageUrl: r.imageUrl,
           stockAvailability: (r.stockAvailability || "in").toLowerCase(),
         }));
@@ -140,38 +137,41 @@ export default function OrdersPage() {
   const daysToShow = computeVisibleWeekdays(5);
 
   // Build daysWithItems by matching menuItems day short names
-  const daysWithItems = daysToShow.map((d) => {
-    // compute weekday short like 'mon','tue' from the date
-    const wk = new Date(d.iso)
-      .toLocaleDateString(undefined, { weekday: "short" })
-      .slice(0, 3)
-      .toLowerCase();
+  const daysWithItems = daysToShow
+    .map((d) => {
+      // compute weekday short like 'mon','tue' from the date
+      const wk = new Date(d.iso)
+        .toLocaleDateString(undefined, { weekday: "short" })
+        .slice(0, 3)
+        .toLowerCase();
 
-    // find items that include this weekday in their day field
-    const items = menuItems.filter((mi) => {
-      if (!mi.day) return false;
-      const allowed = mi.day
-        .split(/[\s,;|]+/)
-.map(x =>
-  x
-    .toString()
-    .trim()
-    .replace(/\u00A0/g, "")  // remove NBSP
-    .replace(/\s+/g, "")     // remove hidden spaces
-    .slice(0, 3)
-    .toLowerCase()
-);
+      // find items that include this weekday in their day field
+      const items = menuItems.filter((mi) => {
+        if (!mi.day) return false;
+        const allowed = mi.day
+          .split(/[\s,;|]+/)
+          .map((x) =>
+            x
+              .toString()
+              .trim()
+              .replace(/\u00A0/g, "") // remove NBSP
+              .replace(/\s+/g, "")    // remove hidden spaces
+              .slice(0, 3)
+              .toLowerCase()
+          );
 
+        return allowed.includes(wk);
+      });
 
-      return allowed.includes(wk);
-    });
-
-    return { ...d, wk, items };
-  }).filter(d => d.items.length > 0); // keep only days that actually have items
+      return { ...d, wk, items };
+    })
+    .filter((d) => d.items.length > 0); // keep only days that actually have items
 
   return (
-    <div className="container">
-      <h1 className="page-title">Kitchen-Line Up</h1>
+    <div className="container orders-page">
+      <h1 className="page-title">
+        <span>Kitchen Line-Up</span>
+      </h1>
 
       {daysWithItems.length === 0 && (
         <div className="glass-card" style={{ padding: 20 }}>
@@ -188,9 +188,9 @@ export default function OrdersPage() {
         });
 
         return (
-          <section key={d.iso} style={{ marginBottom: 38 }}>
+          <section key={d.iso} className="day-section">
             <div className="date-tile fade-soft">
-              <span className="date-icon"></span>
+              <span className="date-icon">📅</span>
               <span>{labelFull}</span>
             </div>
 
@@ -204,7 +204,8 @@ export default function OrdersPage() {
                 if (category === "lunch") {
                   const delivery = new Date(d.iso);
                   delivery.setHours(11, 0, 0, 0);
-                  const diffHours = (delivery.getTime() - Date.now()) / 3600000;
+                  const diffHours =
+                    (delivery.getTime() - Date.now()) / 3600000;
                   const hoursLeftToClose = diffHours - 14;
                   isClosed = hoursLeftToClose <= 0;
                   countdownText = isClosed
@@ -216,7 +217,8 @@ export default function OrdersPage() {
                 if (category === "snacks") {
                   const delivery = new Date(d.iso);
                   delivery.setHours(16, 0, 0, 0);
-                  const diffHours = (delivery.getTime() - Date.now()) / 3600000;
+                  const diffHours =
+                    (delivery.getTime() - Date.now()) / 3600000;
                   const hoursLeftToClose = diffHours - 14;
                   isClosed = hoursLeftToClose <= 0;
                   countdownText = isClosed
@@ -229,11 +231,13 @@ export default function OrdersPage() {
 
                 return (
                   <div
-                    className="food-card"
+                    className="food-card premium-card"
                     key={it.id}
                     style={{
                       position: "relative",
-                      filter: isBlocked ? "grayscale(70%) blur(0.5px)" : "none",
+                      filter: isBlocked
+                        ? "grayscale(70%) blur(0.5px)"
+                        : "none",
                       opacity: isBlocked ? 0.6 : 1,
                     }}
                   >
@@ -243,13 +247,16 @@ export default function OrdersPage() {
                           position: "absolute",
                           top: 10,
                           right: 10,
-                          background: isOutOfStock ? "rgba(255,0,0,0.85)" : "rgba(255,165,0,0.9)",
+                          background: isOutOfStock
+                            ? "rgba(255,0,0,0.85)"
+                            : "rgba(255,165,0,0.9)",
                           padding: "6px 12px",
                           color: "white",
                           fontWeight: 700,
                           borderRadius: "8px",
                           fontSize: 12,
                           boxShadow: "0 0 10px black",
+                          zIndex: 2,
                         }}
                       >
                         {isOutOfStock ? "OUT OF STOCK" : "ORDER CLOSED"}
@@ -266,16 +273,23 @@ export default function OrdersPage() {
                     </div>
 
                     <div className="food-info">
-                      <h3>{it.name}</h3>
-                      <p>{it.description || "No description"}</p>
+                      <h3 className="food-title">{it.name}</h3>
+                      <p className="food-desc">
+                        {it.description || "No description"}
+                      </p>
 
-                      <div style={{ fontSize: 12, color: "#9fbbe0" }}>
+                      <div className="slot-text">
                         {category === "snacks"
                           ? "Delivery Slot: 04:00 PM – 06:00 PM"
                           : "Delivery Slot: 11:00 AM – 01:00 PM"}
                       </div>
 
-                      <div style={{ fontSize: 12, marginTop: 6, marginBottom: 6, color: isClosed ? "red" : "#4ade80" }}>
+                      <div
+                        className="countdown-text"
+                        style={{
+                          color: isClosed ? "#f97373" : "#4ade80",
+                        }}
+                      >
                         {countdownText}
                       </div>
 
@@ -298,11 +312,20 @@ export default function OrdersPage() {
                               category: it.category,
                               deliveryDate: d.iso,
                               deliveryAvailable: !isClosed,
-                              dayLabel: new Date(d.iso).toLocaleDateString(undefined, { weekday: "long" }),
+                              dayLabel: new Date(d.iso).toLocaleDateString(
+                                undefined,
+                                { weekday: "long" }
+                              ),
                             });
                           }}
                         >
-                          {isBlocked ? (isOutOfStock ? "Out of Stock" : "Order Closed") : `Add to cart (for ${new Date(d.iso).toLocaleDateString()})`}
+                          {isBlocked
+                            ? isOutOfStock
+                              ? "Out of Stock"
+                              : "Order Closed"
+                            : `Add to cart (for ${new Date(
+                                d.iso
+                              ).toLocaleDateString()})`}
                         </button>
                       </div>
                     </div>
@@ -314,22 +337,154 @@ export default function OrdersPage() {
         );
       })}
 
-      {/* inline CSS kept from your original for date-tile & image overrides */}
+      {/* Inline styles: glass date tile + premium card layout */}
       <style>{`
-        .date-tile { width: fit-content; margin: 14px auto 26px; padding: 10px 22px; border-radius: 20px; background: rgba(255,255,255,0.08); backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,0.20); color: #bde0ff; font-size: 1.05rem; font-weight: 600; display: flex; align-items: center; gap: 8px; box-shadow: 0 0 18px rgba(0,160,255,0.28); animation: glowPulse 2.2s infinite ease-in-out; }
-        .date-icon { font-size: 1.2rem; }
-        .fade-soft { animation: fadeInSoft 0.7s ease-out; }
-        @keyframes fadeInSoft { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes glowPulse { 0% { box-shadow: 0 0 12px rgba(0,160,255,0.25); } 50% { box-shadow: 0 0 22px rgba(0,160,255,0.45); } 100% { box-shadow: 0 0 12px rgba(0,160,255,0.25); } }
+        .orders-page {
+          padding-top: 10px;
+        }
 
-        .card-img-box { width: 100%; height: auto !important; max-height: none !important; padding: 10px 10px 4px; display:flex; justify-content:center; align-items:center; background: radial-gradient(circle at top, #1e293b, #020617); }
-        .food-img { width: 100%; height: auto !important; object-fit: contain !important; border-radius: 18px; display: block; box-shadow: 0 18px 32px rgba(15,23,42,0.7); }
-        @media (max-width:640px) { .food-img { border-radius:16px; box-shadow:0 12px 24px rgba(15,23,42,0.7);} }
+        .day-section {
+          margin-bottom: 40px;
+        }
 
-        .food-card { display:flex; flex-direction: column; }
-        .food-card .card-img-box { width:100%; aspect-ratio:4/3; padding:12px; border-radius:24px 24px 0 0; background: radial-gradient(circle at top, #1e293b, #020617); display:flex; justify-content:center; align-items:center; overflow:hidden; }
-        .food-card .card-img-box img.food-img { max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain; border-radius:18px; display:block; box-shadow:0 18px 30px rgba(15,23,42,0.85); }
-        @media (max-width:640px) { .food-card .card-img-box { aspect-ratio:1/1; padding:10px; } .food-card .card-img-box img.food-img { border-radius:16px; box-shadow:0 12px 24px rgba(15,23,42,0.8); } }
+        .date-tile {
+          width: fit-content;
+          margin: 18px auto 26px;
+          padding: 10px 24px;
+          border-radius: 999px;
+          background: rgba(15, 23, 42, 0.85);
+          backdrop-filter: blur(18px);
+          border: 1px solid rgba(96, 165, 250, 0.6);
+          color: #dbeafe;
+          font-size: 1.05rem;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          box-shadow: 0 0 24px rgba(37, 99, 235, 0.55);
+        }
+
+        .date-icon {
+          font-size: 1.3rem;
+        }
+
+        .fade-soft {
+          animation: fadeInSoft 0.6s ease-out;
+        }
+
+        @keyframes fadeInSoft {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+          gap: 24px;
+          align-items: stretch;
+        }
+
+        .premium-card {
+          border-radius: 20px;
+          overflow: hidden;
+          background: radial-gradient(circle at top, rgba(15,23,42,0.9), rgba(15,23,42,0.96));
+          border: 1px solid rgba(148, 163, 184, 0.35);
+          box-shadow: 0 20px 50px rgba(15, 23, 42, 0.9);
+          display: flex;
+          flex-direction: column;
+          transition: transform 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease;
+        }
+
+        @media (min-width: 768px) {
+          .premium-card:hover {
+            transform: translateY(-6px) scale(1.015);
+            box-shadow: 0 26px 60px rgba(15, 23, 42, 0.95);
+            border-color: rgba(96, 165, 250, 0.8);
+          }
+        }
+
+        .card-img-box {
+          width: 100%;
+          height: 180px; /* 🔥 fixed height for alignment */
+          padding: 10px 10px 6px;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          background: radial-gradient(circle at top, #1e293b, #020617);
+          overflow: hidden;
+        }
+
+        .food-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          border-radius: 18px;
+          display: block;
+          box-shadow: 0 18px 32px rgba(15, 23, 42, 0.9);
+          transition: transform 0.35s ease;
+        }
+
+        .premium-card:hover .food-img {
+          transform: scale(1.05);
+        }
+
+        .food-info {
+          padding: 16px 18px 18px;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .food-title {
+          font-size: 1rem;
+          font-weight: 700;
+          color: #e5edff;
+        }
+
+        .food-desc {
+          font-size: 0.85rem;
+          color: #9fbbe0;
+          line-height: 1.4;
+          min-height: 36px;
+        }
+
+        .slot-text {
+          font-size: 0.75rem;
+          color: #93c5fd;
+        }
+
+        .countdown-text {
+          font-size: 0.78rem;
+          margin-top: 4px;
+        }
+
+        .card-actions {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-top: 10px;
+        }
+
+        .price {
+          color: #6ee7b7;
+          font-weight: 800;
+          font-size: 1.05rem;
+        }
+
+        .btn-primary {
+          padding: 8px 14px;
+          font-size: 0.8rem;
+        }
+
+        @media (max-width: 640px) {
+          .card-img-box {
+            height: 170px;
+          }
+          .food-info {
+            padding: 14px 14px 16px;
+          }
+        }
       `}</style>
     </div>
   );
