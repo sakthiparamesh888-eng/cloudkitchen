@@ -1667,8 +1667,8 @@ body {
   .brand-block {
     display: flex;
     align-items: center;
-    gap: 10px;
-    max-width: 78%;
+    gap: 12px;
+    max-width: 83%;
     overflow: hidden;
     flex-shrink: 1;
   }
@@ -1676,20 +1676,20 @@ body {
   .brand-text {
     display: flex;
     flex-direction: column;
-    line-height: 1.05;
+    line-height: 1.3;
     overflow: hidden;
     white-space: nowrap;  /* prevents line breaks */
   }
 
   .brand-en {
-    font-size: 1.06rem !important;
+    font-size: 1.08rem !important;
     font-weight: 800;
     white-space: nowrap;
     text-overflow: ellipsis;
   }
 
   .brand-ta {
-    font-size: 0.85rem !important;
+    font-size: 1.2rem !important;
     white-space: nowrap;
   }
 
@@ -1739,7 +1739,7 @@ body {
 /* MOBILE FIXED ALIGNMENT */
 @media (max-width: 768px) {
   .brand-en {
-    font-size: 1.35rem;
+    font-size: 2rem;
   }
   .brand-ta {
     font-size: 0.95rem;
