@@ -37,46 +37,44 @@ function generateSequentialDates(startIso, n = 5) {
  */
 function computeVisibleWeekdays(n = 5) {
   const now = new Date();
-  const dow = now.getDay(); // 0 Sun .. 6 Sat
 
-  // If Saturday or Sunday -> show next week's Monday..Friday
-  if (dow === 6 || dow === 0) {
-    const nextMonIso = nextDateForWeekday("mon", now); // utility returns next occurrence (not today)
-    return generateSequentialDates(nextMonIso, n);
-  }
-
-  // Otherwise (Mon-Fri) -> build upcomingDates(14) and pick first n weekdays (Mon-Fri) starting from today
-  const next14 = upcomingDates(14); // returns {iso, weekday, dateObj} starting from tomorrow
-  // include today manually
+  // ALWAYS build from today + upcoming dates (no weekend jump)
+  const next14 = upcomingDates(14); // from tomorrow
   const today = {
-    iso: new Date().toISOString().split("T")[0],
-    weekday: (new Date()).toLocaleDateString(undefined, { weekday: "short" }).slice(0,3).toLowerCase(),
-    dateObj: new Date(),
+    iso: now.toISOString().split("T")[0],
+    dateObj: now,
   };
 
-  // combine today + next14, then filter weekdays Mon-Fri
+  // Combine today + next days
   const combined = [today, ...next14];
+
+  // Filter only Mon–Fri
   const weekdays = combined.filter((d) => {
     const dayIndex = new Date(d.iso).getDay();
-    return dayIndex >= 1 && dayIndex <= 5; // Mon-Fri
+    return dayIndex >= 1 && dayIndex <= 5; // Mon–Fri only
   });
 
-  // take first n unique ISO dates
+  // Take first n unique weekdays
   const unique = [];
   for (const d of weekdays) {
-    if (!unique.find(u => u.iso === d.iso)) unique.push(d);
+    if (!unique.find((u) => u.iso === d.iso)) {
+      unique.push(d);
+    }
     if (unique.length >= n) break;
   }
 
-  // If we somehow have less than n (edge case), extend using nextDateForWeekday starting next Monday
+  // Edge-case: if less than n, extend from next Monday
   if (unique.length < n) {
-    const nextMonIso = nextDateForWeekday("mon", new Date());
-    const extra = generateSequentialDates(nextMonIso, n).filter(e => !unique.find(u => u.iso === e.iso)).slice(0, n - unique.length);
+    const nextMonIso = nextDateForWeekday("mon", now);
+    const extra = generateSequentialDates(nextMonIso, n)
+      .filter((e) => !unique.find((u) => u.iso === e.iso))
+      .slice(0, n - unique.length);
     return [...unique, ...extra];
   }
 
   return unique.slice(0, n);
 }
+
 
 export default function OrdersPage() {
   const { addToCart } = useCart();
@@ -102,7 +100,19 @@ export default function OrdersPage() {
           price: Number(r.price || 0),
           category: (r.category || "").toLowerCase(),
           isActive: (r.isActive || "true").toLowerCase() === "true",
-          day: (r.day || r.availableDays || "").toLowerCase(),
+          day: (
+  (r.day ||
+   r.availableDays ||
+   r.availabledays ||
+   "")
+    .toString()
+    .trim()
+    .replace(/\u00A0/g, "")  // remove non-breaking spaces
+    .replace(/\s+/g, "")     // remove normal spaces
+    .toLowerCase()
+),
+
+
           imageUrl: r.imageUrl,
           stockAvailability: (r.stockAvailability || "in").toLowerCase(),
         }));
@@ -142,7 +152,17 @@ export default function OrdersPage() {
       if (!mi.day) return false;
       const allowed = mi.day
         .split(/[\s,;|]+/)
-        .map((x) => x.trim().slice(0, 3).toLowerCase());
+.map(x =>
+  x
+    .toString()
+    .trim()
+    .replace(/\u00A0/g, "")  // remove NBSP
+    .replace(/\s+/g, "")     // remove hidden spaces
+    .slice(0, 3)
+    .toLowerCase()
+);
+
+
       return allowed.includes(wk);
     });
 
