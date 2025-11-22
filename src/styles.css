@@ -1653,11 +1653,95 @@ body {
 /* Mobile Fine Tuning */
 @media (max-width: 768px) {
   .brand-en {
-    font-size: 1.38rem;
+    font-size: 1.3rem;
     letter-spacing: 1.1px;
   }
 
   .brand-ta {
     font-size: 1.02rem;
+  }
+}
+/* 📱 SMALL SCREEN BRAND FIX */
+@media (max-width: 480px) {
+
+  .brand-block {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 78%;
+    overflow: hidden;
+    flex-shrink: 1;
+  }
+
+  .brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.05;
+    overflow: hidden;
+    white-space: nowrap;  /* prevents line breaks */
+  }
+
+  .brand-en {
+    font-size: 1.06rem !important;
+    font-weight: 800;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .brand-ta {
+    font-size: 0.85rem !important;
+    white-space: nowrap;
+  }
+
+  .brand-logo {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+  }
+
+  .hamburger {
+    display: flex !important;
+    z-index: 99999;
+  }
+}
+/* BRAND TEXT GLOW — FINAL VERSION */
+
+/* Main English Title */
+.brand-en {
+  font-family: "Lugrasimo", cursive;
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #ffffff;
+
+  /* Smooth neon white glow */
+  text-shadow:
+    0 0 4px rgba(255,255,255,0.8),
+    0 0 8px rgba(255,255,255,0.6),
+    0 0 14px rgba(255,255,255,0.4);
+}
+
+/* Tamil Subtitle */
+.brand-ta {
+  font-family: "Noto Sans Tamil", sans-serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #ffd86b;
+
+  /* Golden Glow */
+  text-shadow:
+    0 0 4px rgba(255,215,100,0.9),
+    0 0 10px rgba(255,200,80,0.7),
+    0 0 18px rgba(255,180,60,0.5);
+
+  margin-top: -2px;
+}
+
+/* MOBILE FIXED ALIGNMENT */
+@media (max-width: 768px) {
+  .brand-en {
+    font-size: 1.35rem;
+  }
+  .brand-ta {
+    font-size: 0.95rem;
   }
 }
