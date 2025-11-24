@@ -6,6 +6,7 @@ const STORAGE_KEY = "Thaayar Kitchen_user";
 
 export default function CheckoutPage() {
   const { cart, total, updateQty, removeFromCart, clearCart } = useCart();
+  const [verified, setVerified] = useState(false);
   const [slot, setSlot] = useState("11:00 AM – 01:00 PM");
   const [user, setUser] = useState(null);
 
@@ -13,7 +14,6 @@ export default function CheckoutPage() {
   const STORE_NAME = import.meta.env.VITE_STORE_NAME || "Thaayar Kitchen";
   const ORDERS_WEBHOOK = import.meta.env.VITE_ORDERS_WEBHOOK;
 
-  // Load user
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -71,7 +71,6 @@ Delivery Slot: ${slot}
     return `https://wa.me/${WHATSAPP_NUM.replace(/\+/g, "")}?text=${msg}`;
   }
 
-  // Send to Google Sheet
   async function sendOrderToSheet(orderId) {
     if (!ORDERS_WEBHOOK) return null;
 
@@ -117,68 +116,23 @@ Delivery Slot: ${slot}
     }
   }
 
-  // Razorpay Payment Start
-  async function startRazorpayPayment() {
-    if (!user) return alert("Please sign up before checkout.");
+  // CONFIRM BUTTON
+  function handleConfirmPayment() {
+    if (!user) return alert("Please sign up before confirming your payment.");
 
-    // Create razorpay order
-    const orderRes = await fetch("/api/create-order", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: total * 100 }),
-    });
+    setVerified(true);
+    alert("Payment marked as completed. You can now send the order.");
+  }
 
-    const { order, key } = await orderRes.json();
+  // SEND ORDER TO WHATSAPP
+  async function handleSend() {
+    if (!verified) return alert("Confirm payment first.");
 
-    const options = {
-      key,
-      amount: order.amount,
-      currency: "INR",
-      name: "Thaayar Kitchen",
-      description: "Food Order Payment",
-      order_id: order.id,
+    const finalOrderId = await sendOrderToSheet(Date.now());
+    window.open(whatsappLink(finalOrderId), "_blank");
 
-      handler: async function (response) {
-        // Verify payment
-        const verifyRes = await fetch("/api/verify-payment", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_order_id: response.razorpay_order_id,
-            razorpay_signature: response.razorpay_signature,
-            orderData: {
-              orderId: order.id,
-              customerName: user.name,
-              customerPhone: user.phone,
-              items: cart,
-              totalAmount: total,
-            },
-          }),
-        });
-
-        const verifyJson = await verifyRes.json();
-
-        if (!verifyJson.verified) {
-          alert("Payment verification failed!");
-          return;
-        }
-
-        // Save to sheet, get final Order ID
-        const finalOrderId = await sendOrderToSheet(order.id);
-
-        // Send to WhatsApp
-        window.open(whatsappLink(finalOrderId || order.id), "_blank");
-
-        clearCart();
-        window.location.href = "/success";
-      },
-
-      theme: { color: "#0080ff" },
-    };
-
-    const rzp = new window.Razorpay(options);
-    rzp.open();
+    clearCart();
+    setTimeout(() => (window.location.href = "/success"), 900);
   }
 
   return (
@@ -275,42 +229,78 @@ Delivery Slot: ${slot}
             ))}
           </select>
 
-          {/* ⭐ RAZORPAY BUTTON */}
-          <button
-            className="btn-confirm"
-            onClick={startRazorpayPayment}
+          {/* QR CODE BOX */}
+          <div
             style={{
-              background:
-                "linear-gradient(135deg, #00c6ff, #0072ff)",
-              color: "#fff",
-              borderRadius: "12px",
-              padding: "14px",
-              marginTop: "20px",
-              fontSize: "17px",
-              width: "100%",
-              cursor: "pointer",
-              fontWeight: "600",
+              display: "flex",
+              justifyContent: "center",
+              marginTop: 20,
             }}
           >
-            💳 Pay Securely with Razorpay
-          </button>
-
-          {!user && (
-            <button
-              className="btn-outline"
-              onClick={() => (window.location.href = "/auth")}
+            <div
               style={{
-                borderColor: "rgba(34,197,94,0.7)",
-                color: "#a3ffbf",
-                animation: "pulseGreen 1.2s infinite ease-in-out",
-                marginTop: 10,
-                background:
-                  "linear-gradient(90deg, rgba(0,0,0,0.25), rgba(0,0,0,0.55))",
+                padding: 22,
+                borderRadius: "22px",
+                backdropFilter: "blur(14px)",
+                background: "rgba(255,255,255,0.08)",
+                border: "1px solid rgba(255,255,255,0.18)",
+                boxShadow: "0 0 22px rgba(0,0,0,0.35)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
               }}
             >
-              ✨ Sign up to Continue
-            </button>
-          )}
+              <img
+                src="/gpay-qr.png"
+                alt="QR"
+                style={{
+                  width: 220,
+                  height: 220,
+                  objectFit: "contain",
+                  background: "#fff",
+                  borderRadius: "16px",
+                  padding: "12px",
+                }}
+              />
+            </div>
+          </div>
+
+          <p
+            style={{
+              textAlign: "center",
+              color: "#a8c7ff",
+              fontSize: 13,
+              marginTop: 6,
+            }}
+          >
+            Works on GPay • PhonePe • Paytm • BHIM
+          </p>
+
+          {/* CONFIRM PAYMENT */}
+          <button
+            className="btn-confirm"
+            onClick={handleConfirmPayment}
+            disabled={!user}
+            style={{
+              opacity: user ? 1 : 0.4,
+              marginTop: 15,
+            }}
+          >
+            ✔ I Have Completed Payment
+          </button>
+
+          {/* SEND ORDER */}
+          <button
+            className="btn-whatsapp-final"
+            disabled={!verified || !user}
+            onClick={handleSend}
+            style={{
+              opacity: !verified || !user ? 0.4 : 1,
+              marginTop: 12,
+            }}
+          >
+            📩 Send Order via WhatsApp
+          </button>
 
           <button
             className="btn-outline remove"
@@ -321,14 +311,6 @@ Delivery Slot: ${slot}
           </button>
         </div>
       </div>
-
-      <style>{`
-        @keyframes pulseGreen {
-          0% { box-shadow: 0 0 3px rgba(34,197,94,0.4); transform: scale(1); opacity: 0.75; }
-          50% { box-shadow: 0 0 25px rgba(34,197,94,1); transform: scale(1.07); opacity: 1; }
-          100% { box-shadow: 0 0 3px rgba(34,197,94,0.4); transform: scale(1); opacity: 0.75; }
-        }
-      `}</style>
     </div>
   );
 }
