@@ -6,7 +6,6 @@ const STORAGE_KEY = "Thaayar Kitchen_user";
 
 export default function CheckoutPage() {
   const { cart, total, updateQty, removeFromCart, clearCart } = useCart();
-  const [verified, setVerified] = useState(false);
   const [slot, setSlot] = useState("11:00 AM – 01:00 PM");
   const [user, setUser] = useState(null);
 
@@ -14,6 +13,7 @@ export default function CheckoutPage() {
   const STORE_NAME = import.meta.env.VITE_STORE_NAME || "Thaayar Kitchen";
   const ORDERS_WEBHOOK = import.meta.env.VITE_ORDERS_WEBHOOK;
 
+  // Load user
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -71,74 +71,114 @@ Delivery Slot: ${slot}
     return `https://wa.me/${WHATSAPP_NUM.replace(/\+/g, "")}?text=${msg}`;
   }
 
-// inside src/pages/CheckoutPage.jsx (replace your sendOrderToSheet function)
-// inside src/pages/CheckoutPage.jsx (REPLACE your sendOrderToSheet function)
-async function sendOrderToSheet() {
-  if (!ORDERS_WEBHOOK) return null;
+  // Send to Google Sheet
+  async function sendOrderToSheet(orderId) {
+    if (!ORDERS_WEBHOOK) return null;
 
-  const now = new Date();
-
-  // ⭐ EXACT TIMESTAMP WHEN CUSTOMER PLACES ORDER
-  const orderPlacedAt = now.toLocaleString("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "medium",
-    hour12: true,
-  });
-
-  const payload = {
-    "Name": user?.name || "",
-    "Phone": user?.phone || "",
-    "Address": user?.address || "",
-    "Order Items": cart
-      .map(i => `${i.qty || 1}x ${i.name} (${new Date(i.deliveryDate).toLocaleDateString()})`)
-      .join(" | "),
-    "Amount": total,
-    "Slot": slot,
-    "Date": now.toLocaleDateString(),
-
-    // ⭐ ADDING ORDER TIME HERE
-    "orderPlacedAt": orderPlacedAt
-  };
-
-  try {
-    const res = await fetch(ORDERS_WEBHOOK, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams(payload).toString(),
+    const now = new Date();
+    const orderPlacedAt = now.toLocaleString("en-IN", {
+      dateStyle: "medium",
+      timeStyle: "medium",
+      hour12: true,
     });
 
-    const data = await res.json();
-    console.log("SCRIPT RESPONSE:", data);
+    const payload = {
+      Name: user?.name || "",
+      Phone: user?.phone || "",
+      Address: user?.address || "",
+      "Order Items": cart
+        .map(
+          (i) =>
+            `${i.qty || 1}x ${i.name} (${new Date(
+              i.deliveryDate
+            ).toLocaleDateString()})`
+        )
+        .join(" | "),
+      Amount: total,
+      Slot: slot,
+      Date: now.toLocaleDateString(),
+      orderPlacedAt,
+      orderId,
+    };
 
-    if (data && data.success && data.orderId) {
-      return data.orderId;
-    } else {
-      console.error("Sheet save failed:", data);
+    try {
+      const res = await fetch(ORDERS_WEBHOOK, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(payload).toString(),
+      });
+
+      const data = await res.json();
+      if (data?.success && data?.orderId) return data.orderId;
+      return null;
+    } catch (err) {
+      console.error("Sheet ERROR:", err);
       return null;
     }
-  } catch (err) {
-    console.error("SHEET ERROR:", err);
-    return null;
-  }
-}
-
-  function handleConfirmPayment() {
-    if (!user)
-      return alert("Please sign up before confirming your payment.");
-
-    setVerified(true);
-    alert("Payment marked as completed. You can now send the order.");
   }
 
-  async function handleSend() {
-    if (!verified) return alert("Confirm payment first.");
+  // Razorpay Payment Start
+  async function startRazorpayPayment() {
+    if (!user) return alert("Please sign up before checkout.");
 
-    const orderId = await sendOrderToSheet();
-    if (!orderId) return alert("Order could not be saved!");
+    // Create razorpay order
+    const orderRes = await fetch("/api/create-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: total * 100 }),
+    });
 
-    window.open(whatsappLink(orderId), "_blank");
-    clearCart();
-    setTimeout(() => (window.location.href = "/success"), 900);
+    const { order, key } = await orderRes.json();
+
+    const options = {
+      key,
+      amount: order.amount,
+      currency: "INR",
+      name: "Thaayar Kitchen",
+      description: "Food Order Payment",
+      order_id: order.id,
+
+      handler: async function (response) {
+        // Verify payment
+        const verifyRes = await fetch("/api/verify-payment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_signature: response.razorpay_signature,
+            orderData: {
+              orderId: order.id,
+              customerName: user.name,
+              customerPhone: user.phone,
+              items: cart,
+              totalAmount: total,
+            },
+          }),
+        });
+
+        const verifyJson = await verifyRes.json();
+
+        if (!verifyJson.verified) {
+          alert("Payment verification failed!");
+          return;
+        }
+
+        // Save to sheet, get final Order ID
+        const finalOrderId = await sendOrderToSheet(order.id);
+
+        // Send to WhatsApp
+        window.open(whatsappLink(finalOrderId || order.id), "_blank");
+
+        clearCart();
+        window.location.href = "/success";
+      },
+
+      theme: { color: "#0080ff" },
+    };
+
+    const rzp = new window.Razorpay(options);
+    rzp.open();
   }
 
   return (
@@ -158,8 +198,11 @@ async function sendOrderToSheet() {
       </div>
 
       <div className="checkout-layout">
+        {/* ITEMS */}
         <div className="checkout-items">
-          {cart.length === 0 && <div className="glass-empty">Your cart is empty</div>}
+          {cart.length === 0 && (
+            <div className="glass-empty">Your cart is empty</div>
+          )}
 
           {cart.map((it) => (
             <div className="glass-card checkout-card-new" key={it.id}>
@@ -211,8 +254,7 @@ async function sendOrderToSheet() {
         {/* SUMMARY */}
         <div className="checkout-summary glass-card better-summary">
           <h2 className="summary-title">
-            Order Summary{" "}
-            <span className="summary-sub">(Includes delivery)</span>
+            Order Summary <span className="summary-sub">(Includes delivery)</span>
           </h2>
 
           <div className="summary-row">
@@ -233,85 +275,26 @@ async function sendOrderToSheet() {
             ))}
           </select>
 
-          {/* 🔵 NEW PROFESSIONAL QR SECTION */}
-          <h3 className="qr-heading" style={{ marginTop: 20, marginBottom: 10 }}>
-            Scan & Pay Securely
-          </h3>
-
-          <div
-  style={{
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingTop: 10,
-    paddingBottom: 20,
-  }}
->
-  <div
-    style={{
-      padding: 22,
-      borderRadius: "22px",
-      backdropFilter: "blur(14px)",
-      background: "rgba(255, 255, 255, 0.08)",
-      border: "1px solid rgba(255, 255, 255, 0.18)",
-      boxShadow: "0 0 22px rgba(0,0,0,0.35)",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-    }}
-  >
-    <img
-      src="/gpay-qr.png"
-      alt="Scan to Pay"
-      style={{
-        width: 220,
-        height: 220,
-        objectFit: "contain",   // 🚀 prevents cropping
-        background: "#fff",
-        borderRadius: "16px",
-        padding: "12px",        // ⭐ extra safe space so UPI ID text appears
-      }}
-    />
-
-    <div
-      style={{
-        marginTop: 10,
-        fontSize: "14px",
-        color: "#d9eaff",
-        letterSpacing: "0.3px",
-      }}
-    >
-      
-    </div>
-  </div>
-</div>
-
-
-          <p
-            style={{
-              textAlign: "center",
-              color: "#a8c7ff",
-              fontSize: 13,
-              marginTop: 6,
-            }}
-          >
-            Works on GPay • PhonePe • Paytm • BHIM
-          </p>
-
-          {/* CONFIRM BUTTON */}
+          {/* ⭐ RAZORPAY BUTTON */}
           <button
             className="btn-confirm"
-            onClick={handleConfirmPayment}
-            disabled={!user}
+            onClick={startRazorpayPayment}
             style={{
-              opacity: user ? 1 : 0.4,
-              pointerEvents: user ? "auto" : "none",
+              background:
+                "linear-gradient(135deg, #00c6ff, #0072ff)",
+              color: "#fff",
+              borderRadius: "12px",
+              padding: "14px",
+              marginTop: "20px",
+              fontSize: "17px",
+              width: "100%",
+              cursor: "pointer",
+              fontWeight: "600",
             }}
           >
-            ✔ I Have Completed Payment
+            💳 Pay Securely with Razorpay
           </button>
 
-          {/* SIGNUP */}
           {!user && (
             <button
               className="btn-outline"
@@ -328,19 +311,6 @@ async function sendOrderToSheet() {
               ✨ Sign up to Continue
             </button>
           )}
-
-          {/* SEND ORDER */}
-          <button
-            className="btn-whatsapp-final"
-            disabled={!verified || !user}
-            onClick={handleSend}
-            style={{
-              opacity: !verified || !user ? 0.4 : 1,
-              marginTop: 12,
-            }}
-          >
-            📩 Send Order via WhatsApp
-          </button>
 
           <button
             className="btn-outline remove"

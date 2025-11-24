@@ -10,7 +10,11 @@ import FloatingTools from "./components/FloatingTools";
 import AuthPage from "./pages/AuthPage";
 import AboutPage from "./pages/AboutPage";
 import ReviewsPage from "./pages/ReviewsPage";
-
+import Refund from "./pages/Refund";
+import Privacy from "./pages/Privacy";
+import Contact from "./pages/Contact";
+import Terms from "./pages/Terms";
+import Shipping from "./pages/Shipping";
 // ⭐ IMPORT SCROLL FIX
 import ScrollToTop from "./components/ScrollToTop";
 
@@ -31,6 +35,11 @@ export default function App() {
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/reviews" element={<ReviewsPage />} />
         <Route path="/about" element={<AboutPage />} />
+        <Route path="/refund" element={<Refund />} />
+<Route path="/privacy" element={<Privacy />} />
+<Route path="/contact" element={<Contact />} />
+<Route path="/terms" element={<Terms />} />
+<Route path="/shipping" element={<Shipping />} />
       </Routes>
 
       <FloatingTools />
