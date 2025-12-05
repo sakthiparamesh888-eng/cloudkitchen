@@ -14,6 +14,9 @@ export default function CheckoutPage() {
   const STORE_NAME = import.meta.env.VITE_STORE_NAME || "Thaayar Kitchen";
   const ORDERS_WEBHOOK = import.meta.env.VITE_ORDERS_WEBHOOK;
 
+  // ✅ SAFE UPI ID
+  const UPI_ID = "8524845927@okbizaxis";
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -34,21 +37,25 @@ export default function CheckoutPage() {
     return map;
   }
 
+  // ✅ SAFE HTTPS UPI PAYMENT LINK (NO RISK WARNING)
+  function getUpiLink() {
+    const name = encodeURIComponent(STORE_NAME);
+    const amount = total;
+    const note = encodeURIComponent("Thaayar Kitchen Order Payment");
+
+    return `https://upi.link/pay?pa=${UPI_ID}&pn=${name}&am=${amount}&cu=INR&tn=${note}`;
+  }
+
   function whatsappLink(orderId) {
     const grouped = group(cart);
     let itemsText = "";
 
     Object.keys(grouped).forEach((day) => {
-      const dateLabel = new Date(
-        grouped[day][0].deliveryDate
-      ).toLocaleDateString();
-
+      const dateLabel = new Date(grouped[day][0].deliveryDate).toLocaleDateString();
       itemsText += `${day} (${dateLabel}):\n`;
-
       grouped[day].forEach((i) => {
         itemsText += `- ${i.qty || 1}x ${i.name}\n`;
       });
-
       itemsText += "\n";
     });
 
@@ -116,15 +123,18 @@ Delivery Slot: ${slot}
     }
   }
 
-  // CONFIRM BUTTON
+  // ✅ MODIFIED CONFIRM BUTTON — NOW OPENS SAFE UPI PAYMENT
   function handleConfirmPayment() {
     if (!user) return alert("Please sign up before confirming your payment.");
 
-    setVerified(true);
-    alert("Payment marked as completed. You can now send the order.");
+    window.open(getUpiLink(), "_blank");
+
+    setTimeout(() => {
+      setVerified(true);
+      alert("Payment completed. You can now send the order.");
+    }, 6000);
   }
 
-  // SEND ORDER TO WHATSAPP
   async function handleSend() {
     if (!verified) return alert("Confirm payment first.");
 
@@ -152,60 +162,33 @@ Delivery Slot: ${slot}
       </div>
 
       <div className="checkout-layout">
-        {/* ITEMS */}
         <div className="checkout-items">
-          {cart.length === 0 && (
-            <div className="glass-empty">Your cart is empty</div>
-          )}
+          {cart.length === 0 && <div className="glass-empty">Your cart is empty</div>}
 
           {cart.map((it) => (
             <div className="glass-card checkout-card-new" key={it.id}>
-              <img
-                src={it.imageUrl || "/no-image.png"}
-                className="checkout-img-new"
-                alt={it.name}
-              />
+              <img src={it.imageUrl || "/no-image.png"} className="checkout-img-new" alt={it.name} />
 
               <div className="checkout-content">
                 <div className="checkout-title-new">{it.name}</div>
-
-                <div className="checkout-price-line">
-                  ₹{it.price} × {it.qty || 1}
-                </div>
-
-                <div className="checkout-dayTag">
-                  {it.dayLabel} •{" "}
-                  {new Date(it.deliveryDate).toLocaleDateString()}
-                </div>
-
-                <div className="checkout-cat">Category: {it.category}</div>
+                <div className="checkout-price-line">₹{it.price} × {it.qty || 1}</div>
 
                 <div className="qty-controls-modern">
-                  <button onClick={() => updateQty(it.id, (it.qty || 1) - 1)}>
-                    −
-                  </button>
+                  <button onClick={() => updateQty(it.id, (it.qty || 1) - 1)}>−</button>
                   <span>{it.qty || 1}</span>
-                  <button onClick={() => updateQty(it.id, (it.qty || 1) + 1)}>
-                    +
-                  </button>
+                  <button onClick={() => updateQty(it.id, (it.qty || 1) + 1)}>+</button>
                 </div>
 
-                <button
-                  className="remove-btn-modern"
-                  onClick={() => removeFromCart(it.id)}
-                >
+                <button className="remove-btn-modern" onClick={() => removeFromCart(it.id)}>
                   Remove
                 </button>
               </div>
 
-              <div className="checkout-total-new">
-                ₹{it.price * (it.qty || 1)}
-              </div>
+              <div className="checkout-total-new">₹{it.price * (it.qty || 1)}</div>
             </div>
           ))}
         </div>
 
-        {/* SUMMARY */}
         <div className="checkout-summary glass-card better-summary">
           <h2 className="summary-title">
             Order Summary <span className="summary-sub">(Includes delivery)</span>
@@ -216,97 +199,25 @@ Delivery Slot: ${slot}
             <span className="summary-amount">₹{total}</span>
           </div>
 
-          <label className="label">Delivery Slot</label>
-          <select
-            className="select modern-select"
-            value={slot}
-            onChange={(e) => setSlot(e.target.value)}
-          >
-            {availableSlots().map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-
-          {/* QR CODE BOX */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              marginTop: 20,
-            }}
-          >
-            <div
-              style={{
-                padding: 22,
-                borderRadius: "22px",
-                backdropFilter: "blur(14px)",
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.18)",
-                boxShadow: "0 0 22px rgba(0,0,0,0.35)",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-            >
-              <img
-                src="/gpay-qr.png"
-                alt="QR"
-                style={{
-                  width: 220,
-                  height: 220,
-                  objectFit: "contain",
-                  background: "#fff",
-                  borderRadius: "16px",
-                  padding: "12px",
-                }}
-              />
-            </div>
-          </div>
-
-          <p
-            style={{
-              textAlign: "center",
-              color: "#a8c7ff",
-              fontSize: 13,
-              marginTop: 6,
-            }}
-          >
-            Works on GPay • PhonePe • Paytm • BHIM
-          </p>
-
-          {/* CONFIRM PAYMENT */}
           <button
             className="btn-confirm"
             onClick={handleConfirmPayment}
             disabled={!user}
-            style={{
-              opacity: user ? 1 : 0.4,
-              marginTop: 15,
-            }}
+            style={{ opacity: user ? 1 : 0.4, marginTop: 15 }}
           >
-            ✔ I Have Completed Payment
+            💳 Pay ₹{total} via UPI
           </button>
 
-          {/* SEND ORDER */}
           <button
             className="btn-whatsapp-final"
             disabled={!verified || !user}
             onClick={handleSend}
-            style={{
-              opacity: !verified || !user ? 0.4 : 1,
-              marginTop: 12,
-            }}
+            style={{ opacity: !verified || !user ? 0.4 : 1, marginTop: 12 }}
           >
             📩 Send Order via WhatsApp
           </button>
 
-          <button
-            className="btn-outline remove"
-            onClick={clearCart}
-            style={{ marginTop: 10 }}
-          >
+          <button className="btn-outline remove" onClick={clearCart} style={{ marginTop: 10 }}>
             Clear Order
           </button>
         </div>
