@@ -10,6 +10,10 @@ export default function CheckoutPage() {
   const [slot, setSlot] = useState("11:00 AM – 01:00 PM");
   const [user, setUser] = useState(null);
 
+  // ✅ NEW: Prevent double click
+  const [isPaying, setIsPaying] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+
   const WHATSAPP_NUM = import.meta.env.VITE_WHATSAPP_NUMBER;
   const STORE_NAME = import.meta.env.VITE_STORE_NAME || "Thaayar Kitchen";
   const ORDERS_WEBHOOK = import.meta.env.VITE_ORDERS_WEBHOOK;
@@ -37,7 +41,7 @@ export default function CheckoutPage() {
     return map;
   }
 
-  // ✅ SAFE HTTPS UPI PAYMENT LINK (NO RISK WARNING)
+  // ✅ SAFE HTTPS UPI PAYMENT LINK
   function getUpiLink() {
     const name = encodeURIComponent(STORE_NAME);
     const amount = total;
@@ -123,43 +127,37 @@ Delivery Slot: ${slot}
     }
   }
 
-  // ✅ MODIFIED CONFIRM BUTTON — NOW OPENS SAFE UPI PAYMENT
+  // ✅ FIXED PAYMENT (NO DOUBLE CLICK)
   function handleConfirmPayment() {
     if (!user) return alert("Please sign up before confirming your payment.");
+    if (isPaying) return;
 
+    setIsPaying(true);
     window.open(getUpiLink(), "_blank");
 
     setTimeout(() => {
       setVerified(true);
-      alert("Payment completed. You can now send the order.");
-    }, 6000);
+      setIsPaying(false);
+    }, 2500); // ✅ faster verification
   }
 
+  // ✅ FAST WHATSAPP REDIRECTION (NO DOUBLE CLICK)
   async function handleSend() {
     if (!verified) return alert("Confirm payment first.");
+    if (isSending) return;
+
+    setIsSending(true);
 
     const finalOrderId = await sendOrderToSheet(Date.now());
-    window.open(whatsappLink(finalOrderId), "_blank");
+    window.location.href = whatsappLink(finalOrderId); // ✅ FASTEST REDIRECT
 
     clearCart();
-    setTimeout(() => (window.location.href = "/success"), 900);
+    setTimeout(() => (window.location.href = "/success"), 800);
   }
 
   return (
     <div className="checkout-wrapper container fade-in">
       <h1 className="page-title">🧾 Checkout</h1>
-
-      <div
-        className="support-badge"
-        onClick={() =>
-          window.open(
-            `https://wa.me/${WHATSAPP_NUM.replace(/\+/g, "")}?text=Hello%2C%20I%20need%20help`,
-            "_blank"
-          )
-        }
-      >
-        💬 Need help? Contact Support
-      </div>
 
       <div className="checkout-layout">
         <div className="checkout-items">
@@ -167,7 +165,11 @@ Delivery Slot: ${slot}
 
           {cart.map((it) => (
             <div className="glass-card checkout-card-new" key={it.id}>
-              <img src={it.imageUrl || "/no-image.png"} className="checkout-img-new" alt={it.name} />
+              <img
+                src={it.imageUrl || "/no-image.png"}
+                className="checkout-img-new"
+                alt={it.name}
+              />
 
               <div className="checkout-content">
                 <div className="checkout-title-new">{it.name}</div>
@@ -179,12 +181,17 @@ Delivery Slot: ${slot}
                   <button onClick={() => updateQty(it.id, (it.qty || 1) + 1)}>+</button>
                 </div>
 
-                <button className="remove-btn-modern" onClick={() => removeFromCart(it.id)}>
+                <button
+                  className="remove-btn-modern"
+                  onClick={() => removeFromCart(it.id)}
+                >
                   Remove
                 </button>
               </div>
 
-              <div className="checkout-total-new">₹{it.price * (it.qty || 1)}</div>
+              <div className="checkout-total-new">
+                ₹{it.price * (it.qty || 1)}
+              </div>
             </div>
           ))}
         </div>
@@ -199,25 +206,34 @@ Delivery Slot: ${slot}
             <span className="summary-amount">₹{total}</span>
           </div>
 
+          {/* ✅ PAYMENT BUTTON */}
           <button
             className="btn-confirm"
             onClick={handleConfirmPayment}
-            disabled={!user}
-            style={{ opacity: user ? 1 : 0.4, marginTop: 15 }}
+            disabled={!user || isPaying}
+            style={{ opacity: !user || isPaying ? 0.4 : 1, marginTop: 15 }}
           >
-            💳 Pay ₹{total} via UPI
+            {isPaying ? "Opening UPI..." : `💳 Pay ₹${total} via UPI`}
+          </button>
+
+          {/* ✅ SEND TO WHATSAPP */}
+          <button
+            className="btn-whatsapp-final"
+            disabled={!verified || !user || isSending}
+            onClick={handleSend}
+            style={{
+              opacity: !verified || !user || isSending ? 0.4 : 1,
+              marginTop: 12,
+            }}
+          >
+            {isSending ? "Opening WhatsApp..." : "📩 Send Order via WhatsApp"}
           </button>
 
           <button
-            className="btn-whatsapp-final"
-            disabled={!verified || !user}
-            onClick={handleSend}
-            style={{ opacity: !verified || !user ? 0.4 : 1, marginTop: 12 }}
+            className="btn-outline remove"
+            onClick={clearCart}
+            style={{ marginTop: 10 }}
           >
-            📩 Send Order via WhatsApp
-          </button>
-
-          <button className="btn-outline remove" onClick={clearCart} style={{ marginTop: 10 }}>
             Clear Order
           </button>
         </div>
